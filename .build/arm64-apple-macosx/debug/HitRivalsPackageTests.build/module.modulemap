@@ -1,0 +1,4 @@
+module HitRivalsPackageTests {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/HitRivalsPackageTests.build/HitRivalsPackageTests-Swift.h"
+    requires objc
+}

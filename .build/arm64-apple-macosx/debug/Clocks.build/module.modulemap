@@ -1,0 +1,4 @@
+module Clocks {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/Clocks.build/Clocks-Swift.h"
+    requires objc
+}

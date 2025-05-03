@@ -1,0 +1,4 @@
+module IssueReportingTestSupport {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/IssueReportingTestSupport.build/IssueReportingTestSupport-Swift.h"
+    requires objc
+}

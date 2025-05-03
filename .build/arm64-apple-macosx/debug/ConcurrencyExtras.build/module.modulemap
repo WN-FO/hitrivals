@@ -1,0 +1,4 @@
+module ConcurrencyExtras {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/ConcurrencyExtras.build/ConcurrencyExtras-Swift.h"
+    requires objc
+}

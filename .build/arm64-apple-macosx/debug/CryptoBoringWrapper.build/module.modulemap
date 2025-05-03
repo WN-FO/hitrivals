@@ -1,0 +1,4 @@
+module CryptoBoringWrapper {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/CryptoBoringWrapper.build/CryptoBoringWrapper-Swift.h"
+    requires objc
+}

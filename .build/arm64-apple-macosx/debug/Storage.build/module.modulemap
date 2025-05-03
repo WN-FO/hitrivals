@@ -1,0 +1,4 @@
+module Storage {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/Storage.build/Storage-Swift.h"
+    requires objc
+}

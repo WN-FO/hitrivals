@@ -1,0 +1,4 @@
+module HitRivals {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/HitRivals.build/HitRivals-Swift.h"
+    requires objc
+}

@@ -1,0 +1,4 @@
+module Realtime {
+    header "/Users/willnichols/Desktop/HitRivals/.build/arm64-apple-macosx/debug/Realtime.build/Realtime-Swift.h"
+    requires objc
+}
