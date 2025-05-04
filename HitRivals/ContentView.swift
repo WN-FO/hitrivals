@@ -1378,84 +1378,86 @@ struct DashboardView: View {
                     )
                     .padding(.horizontal)
                     .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 4) // Reduced bottom padding
                     
                     // TODAY'S PICKS section
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) { // Reduced spacing
                         HStack {
-                            Image(systemName: "trophy.fill")
-                                .foregroundColor(HRTheme.gold)
-                                .font(.system(size: 20))
-                            
-                            Text("TODAY'S PICKS")
-                                .font(.custom("ComicSansMS-Bold", size: 20))
-                                .foregroundColor(HRTheme.blue)
+                            HStack(spacing: 4) { // Reduced spacing
+                                Image(systemName: "trophy.fill")
+                                    .foregroundColor(HRTheme.gold)
+                                    .font(.system(size: 18)) // Slightly smaller icon
+                                
+                                Text("TODAY'S PICKS")
+                                    .font(.custom("ComicSansMS-Bold", size: 18)) // Slightly smaller text
+                                    .foregroundColor(HRTheme.blue)
+                            }
                             
                             Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        
-                        // Sport selector
-                        HStack(spacing: 0) {
-                            Button(action: {
-                                if gamesViewModel.selectedSport != .mlb {
-                                    gamesViewModel.selectedSport = .mlb
-                                    Task {
-                                        if let user = try? await SupabaseService.shared.getUser() {
-                                            gamesViewModel.fetchGames(userId: user.id.uuidString)
-                                        }
-                                    }
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "baseball.fill")
-                                    Text("MLB")
-                                        .font(.custom("ComicSansMS-Bold", size: 16))
-                                }
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(gamesViewModel.selectedSport == .mlb ? .white : HRTheme.blue)
-                                .background(gamesViewModel.selectedSport == .mlb ? HRTheme.blue : HRTheme.gold.opacity(0.3))
-                                .clipShape(
-                                    RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
-                                )
-                                .overlay(
-                                    RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
-                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
-                                )
-                            }
                             
-                            Button(action: {
-                                if gamesViewModel.selectedSport != .nba {
-                                    gamesViewModel.selectedSport = .nba
-                                    Task {
-                                        if let user = try? await SupabaseService.shared.getUser() {
-                                            gamesViewModel.fetchGames(userId: user.id.uuidString)
+                            // Sport selector
+                            HStack(spacing: 0) {
+                                Button(action: {
+                                    if gamesViewModel.selectedSport != .mlb {
+                                        gamesViewModel.selectedSport = .mlb
+                                        Task {
+                                            if let user = try? await SupabaseService.shared.getUser() {
+                                                gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                            }
                                         }
                                     }
+                                }) {
+                                    HStack(spacing: 4) { // Reduced spacing
+                                        Image(systemName: "baseball.fill")
+                                        Text("MLB")
+                                            .font(.custom("ComicSansMS-Bold", size: 14)) // Smaller text
+                                    }
+                                    .padding(.vertical, 6) // Reduced vertical padding
+                                    .padding(.horizontal, 10) // Reduced horizontal padding
+                                    .foregroundColor(gamesViewModel.selectedSport == .mlb ? .white : HRTheme.blue)
+                                    .background(gamesViewModel.selectedSport == .mlb ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                    .clipShape(
+                                        RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
+                                    )
+                                    .overlay(
+                                        RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
+                                            .stroke(HRTheme.blueBorder, lineWidth: 2) // Thinner border
+                                    )
                                 }
-                            }) {
-                                HStack {
-                                    Image(systemName: "basketball.fill")
-                                    Text("NBA")
-                                        .font(.custom("ComicSansMS-Bold", size: 16))
+                                
+                                Button(action: {
+                                    if gamesViewModel.selectedSport != .nba {
+                                        gamesViewModel.selectedSport = .nba
+                                        Task {
+                                            if let user = try? await SupabaseService.shared.getUser() {
+                                                gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                            }
+                                        }
+                                    }
+                                }) {
+                                    HStack(spacing: 4) { // Reduced spacing
+                                        Image(systemName: "basketball.fill")
+                                        Text("NBA")
+                                            .font(.custom("ComicSansMS-Bold", size: 14)) // Smaller text
+                                    }
+                                    .padding(.vertical, 6) // Reduced vertical padding
+                                    .padding(.horizontal, 10) // Reduced horizontal padding
+                                    .foregroundColor(gamesViewModel.selectedSport == .nba ? .white : HRTheme.blue)
+                                    .background(gamesViewModel.selectedSport == .nba ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                    .clipShape(
+                                        RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
+                                    )
+                                    .overlay(
+                                        RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
+                                            .stroke(HRTheme.blueBorder, lineWidth: 2) // Thinner border
+                                    )
                                 }
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(gamesViewModel.selectedSport == .nba ? .white : HRTheme.blue)
-                                .background(gamesViewModel.selectedSport == .nba ? HRTheme.blue : HRTheme.gold.opacity(0.3))
-                                .clipShape(
-                                    RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
-                                )
-                                .overlay(
-                                    RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
-                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
-                                )
                             }
                         }
                         .padding(.horizontal)
+                        .padding(.vertical, 4) // Reduced padding
                     }
+                    .padding(.bottom, 0) // Removed bottom padding
                     
                     ScrollView {
                         // Games list
