@@ -1,11 +1,6 @@
 # pack-refs with: peeled fully-peeled sorted 
-b4216543734fcc49077cb6c25686e9e7422730b2 refs/heads/ci/xcode16-3
-581a71a59583c58d7fd55b3360ad6299c8aa8c77 refs/heads/dependabot/swift/github.com/apple/swift-crypto-3.12.3
-725215bee6a07260b37a7ff087ed3c43deb157d5 refs/heads/dependabot/swift/github.com/pointfreeco/swift-snapshot-testing-1.18.3
 9c1a2c8f5d6b1904fbd8ff28997d7b7e0d271d13 refs/heads/feat/auth-admin
-831795f226fb75e5cdcb2586321ddd24177a27ed refs/heads/fix-decoder-encoder-instances
 d41a5308e9412d4d504a3e7d84a5f3d2ad75cf89 refs/heads/guilherme/clibs-117-supabase-swift-send-standard-client-headers-on-all-requests
-de1f8ee5377c63021ebe20bae3d6d2308aa9eb63 refs/heads/guilherme/clibs-158-supabase-swift-add-heartbeat-callback
 0f2d85bd69a073770cdba77cc78a3a51cbeb57b7 refs/heads/guilherme/dont-send-non-jwts-in-authorization
 b21c4883215373870f8e8d1f5cffcc2e71ce75cd refs/heads/guilherme/fix/functions-set-auth
 734e6df0aa895ecf36bd8a820fbbc84de816b759 refs/heads/macos-keychain-error
@@ -469,17 +464,12 @@ fc0f6851c81bf81af3dd27ba63c4aabc2c092dad refs/pull/698/head
 0552081126c0d53a1172adf036a483ca256feba4 refs/pull/700/head
 9a7fb69a26455330ab756c42295b44fcc706b180 refs/pull/700/merge
 725215bee6a07260b37a7ff087ed3c43deb157d5 refs/pull/701/head
-6bb9ac86230b171eacd77ccff904d5cb3b996137 refs/pull/701/merge
 aa206dfe0fa953e956736f3fdf95e58a56d4566e refs/pull/704/head
 581a71a59583c58d7fd55b3360ad6299c8aa8c77 refs/pull/706/head
-59694beb83b538405fa1e86d1be7b1516aee5090 refs/pull/706/merge
 de1f8ee5377c63021ebe20bae3d6d2308aa9eb63 refs/pull/709/head
-26db40f3a9d432cc9daeadc5f15e94cf13a2fdb9 refs/pull/709/merge
 1534a5edcf811b073a4e0269258c47fda435241c refs/pull/71/head
 b4216543734fcc49077cb6c25686e9e7422730b2 refs/pull/710/head
-d521c9320025d63cca5a725b94f20be234a2b678 refs/pull/710/merge
 831795f226fb75e5cdcb2586321ddd24177a27ed refs/pull/711/head
-b4edb26db0f9b981aafd7ffef5ab3f568c55d109 refs/pull/711/merge
 04b704f33c4a8eda067b4b4cfd27bc5f070e3f19 refs/pull/72/head
 f5b6cf1de5607ac746f217bf3de228467ed29949 refs/pull/79/head
 c3f7df67518634e04b8facf9f0d17de9aae6e451 refs/pull/8/head

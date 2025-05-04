@@ -291,46 +291,37 @@ class GamesViewModel: ObservableObject {
     
     func fetchGames(userId: String) {
         self.isLoading = true
+        self.errorMessage = nil
         
-        // In a real app, fetch from a sports API
-        // For demo, using mock data
-        let mockGames = [
-            Game(
-                id: 1,
-                homeTeam: "New York Yankees",
-                awayTeam: "Boston Red Sox",
-                homeTeamAbbr: "NYY",
-                awayTeamAbbr: "BOS",
-                startTime: Calendar.current.date(bySettingHour: 19, minute: 5, second: 0, of: selectedDate) ?? Date(),
-                status: "scheduled"
-            ),
-            Game(
-                id: 2,
-                homeTeam: "St. Louis Cardinals",
-                awayTeam: "Chicago Cubs",
-                homeTeamAbbr: "STL",
-                awayTeamAbbr: "CHC",
-                startTime: Calendar.current.date(bySettingHour: 20, minute: 15, second: 0, of: selectedDate) ?? Date(),
-                status: "scheduled"
-            ),
-            Game(
-                id: 3,
-                homeTeam: "Los Angeles Dodgers",
-                awayTeam: "San Francisco Giants",
-                homeTeamAbbr: "LAD",
-                awayTeamAbbr: "SF",
-                startTime: Calendar.current.date(bySettingHour: 22, minute: 10, second: 0, of: selectedDate) ?? Date(),
-                status: "scheduled"
-            )
-        ]
+        // Check if we have a development environment flag to use mock data
+        if ProcessInfo.processInfo.environment["MOCK_MLB_DATA"] == "true" {
+            print("Using mock MLB data due to environment setting")
+            let mockGames = MLBService.shared.getMockMLBGames()
+            
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.games = mockGames
+                self.isLoading = false
+            }
+            return
+        }
         
-        // Check if user has voted - placeholder implementation
-        // In a real app, you would fetch predictions from Supabase
-        
-        DispatchQueue.main.async { [weak self] in
+        // Use the new MLBService to fetch real data for the selected date
+        MLBService.shared.fetchMLBScheduleForDate(date: selectedDate) { [weak self] fetchedGames in
             guard let self = self else { return }
-            self.games = mockGames
-            self.isLoading = false
+            
+            DispatchQueue.main.async {
+                if let games = fetchedGames, !games.isEmpty {
+                    print("Successfully fetched \(games.count) MLB games for the selected date")
+                    self.games = games
+                } else {
+                    // If the API fails, fall back to mock data
+                    print("Failed to fetch MLB data or no games scheduled, using mock data instead")
+                    self.games = MLBService.shared.getMockMLBGames()
+                    self.errorMessage = "Couldn't fetch games for the selected date. Using sample data."
+                }
+                self.isLoading = false
+            }
         }
     }
     
@@ -747,8 +738,11 @@ struct DashboardView: View {
                                     displayedComponents: .date
                                 )
                                 .datePickerStyle(GraphicalDatePickerStyle())
-                                .onChange(of: gamesViewModel.selectedDate) { _, newValue in
+                                .onChange(of: gamesViewModel.selectedDate) { _, newDate in
                                     showDatePicker = false
+                                    print("Date changed to: \(formatDate(newDate))")
+                                    
+                                    // Fetch games for the newly selected date
                                     Task {
                                         if let user = try? await SupabaseService.shared.getUser() {
                                             gamesViewModel.fetchGames(userId: user.id.uuidString)

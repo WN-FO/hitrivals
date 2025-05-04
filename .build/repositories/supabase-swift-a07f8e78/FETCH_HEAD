@@ -1,16 +1,11 @@
-b4216543734fcc49077cb6c25686e9e7422730b2	not-for-merge	branch 'ci/xcode16-3' of https://github.com/supabase/supabase-swift
-581a71a59583c58d7fd55b3360ad6299c8aa8c77	not-for-merge	branch 'dependabot/swift/github.com/apple/swift-crypto-3.12.3' of https://github.com/supabase/supabase-swift
-725215bee6a07260b37a7ff087ed3c43deb157d5	not-for-merge	branch 'dependabot/swift/github.com/pointfreeco/swift-snapshot-testing-1.18.3' of https://github.com/supabase/supabase-swift
 9c1a2c8f5d6b1904fbd8ff28997d7b7e0d271d13	not-for-merge	branch 'feat/auth-admin' of https://github.com/supabase/supabase-swift
-831795f226fb75e5cdcb2586321ddd24177a27ed	not-for-merge	branch 'fix-decoder-encoder-instances' of https://github.com/supabase/supabase-swift
-d41a5308e9412d4d504a3e7d84a5f3d2ad75cf89	not-for-merge	branch 'guilherme/clibs-117-supabase-swift-send-standard-client-headers-on-all-requests' of https://github.com/supabase/supabase-swift
-de1f8ee5377c63021ebe20bae3d6d2308aa9eb63	not-for-merge	branch 'guilherme/clibs-158-supabase-swift-add-heartbeat-callback' of https://github.com/supabase/supabase-swift
+8c4dc93818fe36bfedff484e78909bc4f70affc4	not-for-merge	branch 'fix/push-mainactor' of https://github.com/supabase/supabase-swift
 0f2d85bd69a073770cdba77cc78a3a51cbeb57b7	not-for-merge	branch 'guilherme/dont-send-non-jwts-in-authorization' of https://github.com/supabase/supabase-swift
 b21c4883215373870f8e8d1f5cffcc2e71ce75cd	not-for-merge	branch 'guilherme/fix/functions-set-auth' of https://github.com/supabase/supabase-swift
 734e6df0aa895ecf36bd8a820fbbc84de816b759	not-for-merge	branch 'macos-keychain-error' of https://github.com/supabase/supabase-swift
-7241b7b5261b64eda0d430bc857d836d41d0f600	not-for-merge	branch 'main' of https://github.com/supabase/supabase-swift
+ad031c7e14c4881b76ac1e24ef2738c8c1cf621e	not-for-merge	branch 'main' of https://github.com/supabase/supabase-swift
 b1b6b9d327a3aeddf94290c2f3e9c8284b38b751	not-for-merge	branch 'postgrest-cache' of https://github.com/supabase/supabase-swift
-0552081126c0d53a1172adf036a483ca256feba4	not-for-merge	branch 'release-please--branches--main' of https://github.com/supabase/supabase-swift
+9879668bb052acc6ed67fefced56f85c2dbca156	not-for-merge	branch 'release-please--branches--main' of https://github.com/supabase/supabase-swift
 f84ae8703f99548e66152ed4e7d93e8b37f9c633	not-for-merge	branch 'resumable-upload' of https://github.com/supabase/supabase-swift
 7434e08ec62e1c3b220a50695489ddedff68ed87	not-for-merge	branch 'sample-supadrive' of https://github.com/supabase/supabase-swift
 82784a670660fb9c3edfcb47b9cc27f237bb6530	not-for-merge	branch 'tests/integration-tests' of https://github.com/supabase/supabase-swift
@@ -367,7 +362,7 @@ f54387c2336a0fba529d1fa9dbff4a22c921a758	not-for-merge	'refs/pull/578/head' of h
 6acbc25841b84fd08a275623c083b5b4c0135cc7	not-for-merge	'refs/pull/581/head' of https://github.com/supabase/supabase-swift
 8d9e40034ee018b1f90240dca412d1dc98c8ac2e	not-for-merge	'refs/pull/583/head' of https://github.com/supabase/supabase-swift
 0f2d85bd69a073770cdba77cc78a3a51cbeb57b7	not-for-merge	'refs/pull/584/head' of https://github.com/supabase/supabase-swift
-5427f348b089e34a69841ba856fc73ce471cc05a	not-for-merge	'refs/pull/584/merge' of https://github.com/supabase/supabase-swift
+97c874b80930f2cf8b4ee84469279f584c381b29	not-for-merge	'refs/pull/584/merge' of https://github.com/supabase/supabase-swift
 676711816db2813f32d956ece21b312a26bf0574	not-for-merge	'refs/pull/585/head' of https://github.com/supabase/supabase-swift
 32a71be598f00997fd2477980f539c85ec3a5e56	not-for-merge	'refs/pull/586/head' of https://github.com/supabase/supabase-swift
 f030de9c8b94d74126a3335c1d7a12962d7d3132	not-for-merge	'refs/pull/587/head' of https://github.com/supabase/supabase-swift
@@ -453,8 +448,7 @@ ad1445ab117bcb43a62938422bb792b40f1e8d81	not-for-merge	'refs/pull/674/head' of h
 bcd9e626c8cf42b6eb8e1083628323e4feab0a57	not-for-merge	'refs/pull/678/head' of https://github.com/supabase/supabase-swift
 93948dc8ed82d953358fc81a94575ca19268eb0a	not-for-merge	'refs/pull/681/head' of https://github.com/supabase/supabase-swift
 22f3c285498ec1a56964592c301d84d851d195cd	not-for-merge	'refs/pull/684/head' of https://github.com/supabase/supabase-swift
-d41a5308e9412d4d504a3e7d84a5f3d2ad75cf89	not-for-merge	'refs/pull/685/head' of https://github.com/supabase/supabase-swift
-4f76e8351e9a81c57e075acec9738ef3774dbc40	not-for-merge	'refs/pull/685/merge' of https://github.com/supabase/supabase-swift
+e7a464b397f8e77762ce7ca7502b85962466e601	not-for-merge	'refs/pull/685/head' of https://github.com/supabase/supabase-swift
 5f99e5c66a183340d270a8bf27a220c8d710f169	not-for-merge	'refs/pull/689/head' of https://github.com/supabase/supabase-swift
 abaeeda99d41faa432e4b6adec83de236768629b	not-for-merge	'refs/pull/690/head' of https://github.com/supabase/supabase-swift
 7c514624b4e9da42da34d438a6cf4d0a8a647c77	not-for-merge	'refs/pull/691/head' of https://github.com/supabase/supabase-swift
@@ -465,20 +459,17 @@ ce6873b6a7c3db0d8769d16f9eb1688d39f8c32b	not-for-merge	'refs/pull/695/head' of h
 500dc9e93c47eb5fff8ce2d96e53831823c94a44	not-for-merge	'refs/pull/696/head' of https://github.com/supabase/supabase-swift
 fc0f6851c81bf81af3dd27ba63c4aabc2c092dad	not-for-merge	'refs/pull/698/head' of https://github.com/supabase/supabase-swift
 46b699be265b02c3f731f3e0137a8e5f10dfdf62	not-for-merge	'refs/pull/699/head' of https://github.com/supabase/supabase-swift
-0552081126c0d53a1172adf036a483ca256feba4	not-for-merge	'refs/pull/700/head' of https://github.com/supabase/supabase-swift
-9a7fb69a26455330ab756c42295b44fcc706b180	not-for-merge	'refs/pull/700/merge' of https://github.com/supabase/supabase-swift
-725215bee6a07260b37a7ff087ed3c43deb157d5	not-for-merge	'refs/pull/701/head' of https://github.com/supabase/supabase-swift
-6bb9ac86230b171eacd77ccff904d5cb3b996137	not-for-merge	'refs/pull/701/merge' of https://github.com/supabase/supabase-swift
+df5c5616bae35816029129606a3821b07c08514b	not-for-merge	'refs/pull/700/head' of https://github.com/supabase/supabase-swift
+b9cdee838b4e157160b2719cc2e3e68e2243c9ed	not-for-merge	'refs/pull/701/head' of https://github.com/supabase/supabase-swift
 aa206dfe0fa953e956736f3fdf95e58a56d4566e	not-for-merge	'refs/pull/704/head' of https://github.com/supabase/supabase-swift
-581a71a59583c58d7fd55b3360ad6299c8aa8c77	not-for-merge	'refs/pull/706/head' of https://github.com/supabase/supabase-swift
-59694beb83b538405fa1e86d1be7b1516aee5090	not-for-merge	'refs/pull/706/merge' of https://github.com/supabase/supabase-swift
-de1f8ee5377c63021ebe20bae3d6d2308aa9eb63	not-for-merge	'refs/pull/709/head' of https://github.com/supabase/supabase-swift
-26db40f3a9d432cc9daeadc5f15e94cf13a2fdb9	not-for-merge	'refs/pull/709/merge' of https://github.com/supabase/supabase-swift
+14c8b9982cfa1ddcc06fbb92136a4876e8b94c5f	not-for-merge	'refs/pull/706/head' of https://github.com/supabase/supabase-swift
+cb60535fbf7def32ede6655d62776adb16a125fb	not-for-merge	'refs/pull/709/head' of https://github.com/supabase/supabase-swift
 1534a5edcf811b073a4e0269258c47fda435241c	not-for-merge	'refs/pull/71/head' of https://github.com/supabase/supabase-swift
 b4216543734fcc49077cb6c25686e9e7422730b2	not-for-merge	'refs/pull/710/head' of https://github.com/supabase/supabase-swift
-d521c9320025d63cca5a725b94f20be234a2b678	not-for-merge	'refs/pull/710/merge' of https://github.com/supabase/supabase-swift
 831795f226fb75e5cdcb2586321ddd24177a27ed	not-for-merge	'refs/pull/711/head' of https://github.com/supabase/supabase-swift
-b4edb26db0f9b981aafd7ffef5ab3f568c55d109	not-for-merge	'refs/pull/711/merge' of https://github.com/supabase/supabase-swift
+fa54259e5e6b6d3411d376188bbe264b5aded7e2	not-for-merge	'refs/pull/712/head' of https://github.com/supabase/supabase-swift
+9879668bb052acc6ed67fefced56f85c2dbca156	not-for-merge	'refs/pull/714/head' of https://github.com/supabase/supabase-swift
+ec04057c65cfaa65885029c4afe902491195f5ef	not-for-merge	'refs/pull/714/merge' of https://github.com/supabase/supabase-swift
 04b704f33c4a8eda067b4b4cfd27bc5f070e3f19	not-for-merge	'refs/pull/72/head' of https://github.com/supabase/supabase-swift
 f5b6cf1de5607ac746f217bf3de228467ed29949	not-for-merge	'refs/pull/79/head' of https://github.com/supabase/supabase-swift
 c3f7df67518634e04b8facf9f0d17de9aae6e451	not-for-merge	'refs/pull/8/head' of https://github.com/supabase/supabase-swift
@@ -566,6 +557,7 @@ ec050756d7157b6f4cf59fd52c8fc619f9d2baee	not-for-merge	tag 'v2.24.5' of https://
 6f3fbd600924e570fe228207a179445c788e4a6f	not-for-merge	tag 'v2.25.0' of https://github.com/supabase/supabase-swift
 e2ca2908d80e0b5e2e22659cfe9af4651cebf7c2	not-for-merge	tag 'v2.26.0' of https://github.com/supabase/supabase-swift
 4c4f2a0483a794e9294ae0f550a63881e4ee1de9	not-for-merge	tag 'v2.26.1' of https://github.com/supabase/supabase-swift
+6877053933416744a328720079b0a80657934096	not-for-merge	tag 'v2.27.0' of https://github.com/supabase/supabase-swift
 1a7dad006f94749923e764343aaaeadbe74f0352	not-for-merge	tag 'v2.6.0' of https://github.com/supabase/supabase-swift
 06d85e1f0608db3b2d97f5c158334d433dd61603	not-for-merge	tag 'v2.7.0' of https://github.com/supabase/supabase-swift
 c29ac728f0ac355f2adaf3bd1eec15e59b75dc51	not-for-merge	tag 'v2.8.0' of https://github.com/supabase/supabase-swift
