@@ -459,6 +459,8 @@ class GamesViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedSport: Game.SportType = .mlb
+    @Published var showVoteConfirmation = false
+    @Published var confirmationTeam: String?
     
     func fetchGames(userId: String) {
         self.isLoading = true
@@ -518,6 +520,40 @@ class GamesViewModel: ObservableObject {
     }
     
     func vote(userId: String, gameId: Int, teamChoice: String) {
+        // Enhanced haptic feedback pattern
+        let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+        let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+        let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+        
+        // Prepare all generators for optimal performance
+        lightGenerator.prepare()
+        mediumGenerator.prepare()
+        heavyGenerator.prepare()
+        
+        // Create haptic crescendo effect
+        lightGenerator.impactOccurred()
+        
+        // Delayed second impact
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            mediumGenerator.impactOccurred()
+            
+            // Delayed final impact
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                heavyGenerator.impactOccurred()
+            }
+        }
+        
+        // Show confirmation view
+        self.showVoteConfirmation = true
+        self.confirmationTeam = teamChoice == "home" ? 
+            self.games.first(where: { $0.id == gameId })?.homeTeam : 
+            self.games.first(where: { $0.id == gameId })?.awayTeam
+        
+        // Hide confirmation after delay - increased time to let users enjoy the animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.showVoteConfirmation = false
+        }
+        
         // Placeholder implementation
         // In a real app, you would insert/update prediction in Supabase
         
@@ -721,25 +757,51 @@ struct AvatarView: View {
 struct GameCardView: View {
     var game: Game
     var onVote: (Int, String) -> Void
-    @State private var cardOffset: CGFloat = 30
+    @State private var cardOffset: CGFloat = 50
     @State private var cardOpacity: Double = 0
     @State private var isAnimating = false
     
+    // Get border color based on user's vote
+    var cardBorderColor: Color {
+        guard let vote = game.userVote else {
+            return HRTheme.blueBorder
+        }
+        
+        let teamName = vote == "home" ? game.homeTeam : game.awayTeam
+        
+        // NBA teams with gold theme
+        if teamName.contains("Lakers") || teamName.contains("Warriors") {
+            return HRTheme.goldBorder
+        }
+        
+        // NBA/MLB teams with red theme
+        if teamName.contains("Bulls") || teamName.contains("Heat") || 
+           teamName.contains("Blazers") || teamName.contains("Red Sox") ||
+           teamName.contains("Cardinals") || teamName.contains("Nationals") {
+            return HRTheme.redBorder
+        }
+        
+        // Default to blue for other teams
+        return HRTheme.blueBorder
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(formatGameTime(game.startTime))
-                    .font(HRTheme.Fonts.caption)
-                    .foregroundColor(HRTheme.blue)
-                    .padding(8)
-                    .background(HRTheme.gold.opacity(0.3))
-                    .cornerRadius(8)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatGameTime(game.startTime))
+                        .font(HRTheme.Fonts.body)
+                        .foregroundColor(HRTheme.blue)
+                }
                 
                 Spacer()
                 
-                if game.status == "scheduled" {
-                    HStack(spacing: 6) {
-                        Image(systemName: game.sportType == .mlb ? "baseball.fill" : "basketball.fill")
+                // Game status indicator
+                if game.status == "live" {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
                             .foregroundColor(.white)
                         
                         Text("LIVE")
@@ -801,12 +863,24 @@ struct GameCardView: View {
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(HRTheme.blueBorder, lineWidth: 3)
+                .stroke(cardBorderColor, lineWidth: 3)
         )
         .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
         .offset(y: cardOffset)
         .opacity(cardOpacity)
         .onAppear {
+            // Debug team names to ensure they match with logo files
+            print("Game teams - Home: \(game.homeTeam), Away: \(game.awayTeam)")
+            
+            // Convert Game.SportType to SportsService.SportType
+            let serviceSportType: SportsService.SportType = game.sportType == .nba ? .nba : .mlb
+            
+            // Check if logo files exist for both teams using TeamLogoManager
+            let homeTeamLogo = TeamLogoManager.shared.logoForTeam(abbreviation: game.homeTeamAbbr ?? "", sportType: serviceSportType)
+            let awayTeamLogo = TeamLogoManager.shared.logoForTeam(abbreviation: game.awayTeamAbbr ?? "", sportType: serviceSportType)
+            
+            print("Team logos - Home (\(game.homeTeamAbbr ?? "")): \(homeTeamLogo != nil ? "✅" : "❌"), Away (\(game.awayTeamAbbr ?? "")): \(awayTeamLogo != nil ? "✅" : "❌")")
+            
             withAnimation(Animation.spring(response: 0.6, dampingFraction: 0.7)) {
                 cardOffset = 0
                 cardOpacity = 1
@@ -814,6 +888,7 @@ struct GameCardView: View {
         }
     }
     
+    // Format the game time for display
     private func formatGameTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
@@ -828,6 +903,79 @@ struct TeamRowView: View {
     var onPick: () -> Void
     var isEnabled: Bool
     @State private var isHovering = false
+    @State private var showConfetti = false
+    @State private var logoLoaded = false
+    
+    // Background color based on team selection
+    var backgroundGradient: LinearGradient {
+        if !isSelected {
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.white, Color.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        
+        // For NBA teams
+        if teamName.contains("Lakers") || teamName.contains("Warriors") || teamName.contains("Bulls") {
+            return LinearGradient(
+                gradient: Gradient(colors: [HRTheme.gold.opacity(0.2), HRTheme.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if teamName.contains("Celtics") || teamName.contains("Bucks") {
+            return LinearGradient(
+                gradient: Gradient(colors: [HRTheme.blue.opacity(0.2), HRTheme.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if teamName.contains("Heat") || teamName.contains("Bulls") || teamName.contains("Blazers") {
+            return LinearGradient(
+                gradient: Gradient(colors: [HRTheme.red.opacity(0.2), HRTheme.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        
+        // For MLB teams
+        if teamName.contains("Red Sox") || teamName.contains("Cardinals") || teamName.contains("Nationals") {
+            return LinearGradient(
+                gradient: Gradient(colors: [HRTheme.red.opacity(0.2), HRTheme.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if teamName.contains("Yankees") || teamName.contains("Dodgers") {
+            return LinearGradient(
+                gradient: Gradient(colors: [HRTheme.blue.opacity(0.2), HRTheme.white]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        
+        // Default gradient
+        return LinearGradient(
+            gradient: Gradient(colors: [HRTheme.blue.opacity(0.15), HRTheme.white]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    // Determine the sport type based on team name
+    private var sportType: SportsService.SportType {
+        let nbaTeams = [
+            "Hawks", "Celtics", "Nets", "Hornets", "Bulls", "Cavaliers", "Mavericks", 
+            "Nuggets", "Pistons", "Warriors", "Rockets", "Pacers", "Clippers", "Lakers", 
+            "Grizzlies", "Heat", "Bucks", "Timberwolves", "Pelicans", "Knicks", "Thunder", 
+            "Magic", "76ers", "Suns", "Trail Blazers", "Kings", "Spurs", "Raptors", "Jazz", "Wizards"
+        ]
+        
+        for team in nbaTeams {
+            if teamName.contains(team) {
+                return .nba
+            }
+        }
+        return .mlb
+    }
     
     var body: some View {
         HStack {
@@ -837,9 +985,23 @@ struct TeamRowView: View {
                         .fill(isSelected ? HRTheme.gold : Color.gray.opacity(0.1))
                         .frame(width: 50, height: 50)
                     
-                    Text(teamAbbr)
-                        .font(.custom("ComicSansMS-Bold", size: 16))
-                        .foregroundColor(isSelected ? HRTheme.blue : Color.gray)
+                    if let logoImage = TeamLogoManager.shared.logoImage(for: teamAbbr, sportType: sportType) {
+                        logoImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 40, height: 40)
+                    } else {
+                        // Fallback to text if logo not found
+                        Text(teamAbbr)
+                            .font(.custom("ComicSansMS-Bold", size: 16))
+                            .foregroundColor(isSelected ? HRTheme.blue : Color.gray)
+                    }
+                    
+                    // Confetti overlay when selected
+                    if isSelected && showConfetti {
+                        ConfettiView()
+                            .frame(width: 100, height: 100)
+                    }
                 }
                 
                 Text(teamName)
@@ -849,28 +1011,240 @@ struct TeamRowView: View {
             
             Spacer()
             
-            Button(action: onPick) {
-                Text(isSelected ? "PICKED" : "PICK")
-                    .font(.custom("ComicSansMS-Bold", size: 14))
-                    .tracking(2)
-                    .frame(width: 90)
-                    .padding(.vertical, 10)
+            if isEnabled {
+                Button(action: {
+                    if isEnabled {
+                        // Enhanced haptic feedback pattern
+                        let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+                        let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+                        let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+                        
+                        // Prepare all generators
+                        lightGenerator.prepare()
+                        mediumGenerator.prepare()
+                        heavyGenerator.prepare()
+                        
+                        // Create haptic feedback sequence
+                        lightGenerator.impactOccurred()
+                        
+                        // Delayed second impact
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            mediumGenerator.impactOccurred()
+                            
+                            // Delayed final impact
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                heavyGenerator.impactOccurred()
+                            }
+                        }
+                        
+                        // Trigger animation
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                            showConfetti = true
+                        }
+                        
+                        // Reset animation after delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            showConfetti = false
+                        }
+                        
+                        onPick()
+                    }
+                }) {
+                    if isSelected {
+                        // Checkmark for selected teams
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                ZStack {
+                                    // Shadow layer
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(HRTheme.redShadow)
+                                        .offset(x: 0, y: 3)
+                                    
+                                    // Main button
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(HRTheme.red)
+                                }
+                            )
+                            .scaleEffect(1.05)
+                    } else {
+                        // Original "PICK" text for unselected teams
+                        Text("PICK")
+                            .font(.custom("ComicSansMS-Bold", size: 16))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                ZStack {
+                                    // Shadow layer
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(HRTheme.blueShadow)
+                                        .offset(x: 0, y: 3)
+                                    
+                                    // Main button
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(HRTheme.blue)
+                                }
+                            )
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(!isEnabled)
+                .opacity(isEnabled ? 1.0 : 0.5)
+            } else if isSelected {
+                // Show a checkmark for selected teams in completed games
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(HRTheme.gold)
             }
-            .buttonStyle(CPFMButtonStyle(
-                bgColor: isSelected ? HRTheme.blue : HRTheme.white,
-                borderColor: isSelected ? HRTheme.blueBorder : HRTheme.blueBorder,
-                shadowColor: isSelected ? HRTheme.blueShadow : HRTheme.whiteShadow,
-                textColor: isSelected ? .white : HRTheme.blue
-            ))
-            .disabled(!isEnabled)
-            .opacity(isEnabled ? 1 : 0.5)
-            .scaleEffect(isHovering && isEnabled ? 1.05 : 1)
-            .onHover { hovering in
-                withAnimation(HRTheme.springAnimation) {
-                    isHovering = hovering && isEnabled
+        }
+        .padding()
+        .background(backgroundGradient)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? HRTheme.redBorder : Color.clear, lineWidth: 3)
+        )
+        .shadow(color: isSelected ? HRTheme.redBorder.opacity(0.5) : Color.black.opacity(0.1), radius: 5, x: 0, y: 4)
+    }
+}
+
+// Confetti animation view
+struct ConfettiView: View {
+    let colors: [Color] = [.red, .blue, HRTheme.blue, HRTheme.red, HRTheme.gold, .purple, .orange]
+    @State private var particles: [ConfettiParticle] = []
+    
+    struct ConfettiParticle: Identifiable {
+        let id = UUID()
+        var position: CGPoint
+        var finalPosition: CGPoint
+        var rotation: Double
+        var color: Color
+        var size: CGFloat
+        var shape: ParticleShape
+    }
+    
+    enum ParticleShape {
+        case rectangle, circle, triangle, star
+    }
+    
+    var body: some View {
+        ZStack {
+            ForEach(particles) { particle in
+                Group {
+                    switch particle.shape {
+                    case .rectangle:
+                        Rectangle()
+                            .fill(particle.color)
+                            .frame(width: particle.size, height: particle.size * 3)
+                    case .circle:
+                        Circle()
+                            .fill(particle.color)
+                            .frame(width: particle.size * 2, height: particle.size * 2)
+                    case .triangle:
+                        Triangle()
+                            .fill(particle.color)
+                            .frame(width: particle.size * 2.5, height: particle.size * 2.5)
+                    case .star:
+                        Star(corners: 5, smoothness: 0.45)
+                            .fill(particle.color)
+                            .frame(width: particle.size * 2.5, height: particle.size * 2.5)
+                    }
+                }
+                .position(x: particle.position.x, y: particle.position.y)
+                .rotationEffect(.degrees(particle.rotation))
+                .opacity(0.8)
+            }
+        }
+        .onAppear {
+            generateParticles()
+        }
+    }
+    
+    func generateParticles() {
+        particles = []
+        for _ in 0..<50 {
+            let randomX = CGFloat.random(in: 0...100)
+            let randomY = CGFloat.random(in: 0...100)
+            let finalY = randomY + CGFloat.random(in: 30...70)
+            
+            // Randomly select a shape
+            let shapes: [ParticleShape] = [.rectangle, .circle, .triangle, .star]
+            let randomShape = shapes.randomElement()!
+            
+            let particle = ConfettiParticle(
+                position: CGPoint(x: 50, y: 50),
+                finalPosition: CGPoint(x: randomX, y: finalY),
+                rotation: Double.random(in: 0...360),
+                color: colors.randomElement()!,
+                size: CGFloat.random(in: 2...6),
+                shape: randomShape
+            )
+            particles.append(particle)
+        }
+        
+        // Animate each particle
+        for i in 0..<particles.count {
+            // Different timing for different particles creates a more natural effect
+            let duration = Double.random(in: 0.8...2.0)
+            let delay = Double.random(in: 0...0.3)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(Animation.easeOut(duration: duration).delay(delay)) {
+                    particles[i].position = particles[i].finalPosition
+                    particles[i].rotation += Double.random(in: 180...720)
                 }
             }
         }
+    }
+}
+
+// Helper shape for triangle
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// Helper shape for star
+struct Star: Shape {
+    let corners: Int
+    let smoothness: CGFloat
+    
+    func path(in rect: CGRect) -> Path {
+        guard corners >= 2 else { return Path() }
+        
+        let center = CGPoint(x: rect.width / 2, y: rect.height / 2)
+        let outerRadius = min(rect.width, rect.height) / 2
+        let innerRadius = outerRadius * smoothness
+        
+        let path = Path { path in
+            let angleAdjustment = CGFloat.pi / CGFloat(corners)
+            
+            for i in 0..<corners * 2 {
+                let radius = i.isMultiple(of: 2) ? outerRadius : innerRadius
+                let angle = CGFloat(i) * angleAdjustment
+                
+                let x = center.x + cos(angle) * radius
+                let y = center.y + sin(angle) * radius
+                
+                if i == 0 {
+                    path.move(to: CGPoint(x: x, y: y))
+                } else {
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+            path.closeSubpath()
+        }
+        return path
     }
 }
 
@@ -1146,8 +1520,25 @@ struct DashboardView: View {
                 if profileViewModel.isLoading {
                     LoadingView()
                 }
+                
+                // Vote confirmation overlay
+                if gamesViewModel.showVoteConfirmation, let team = gamesViewModel.confirmationTeam {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                gamesViewModel.showVoteConfirmation = false
+                            }
+                        
+                        VoteConfirmationView(teamName: team)
+                            .padding()
+                    }
+                    .transition(.opacity)
+                    .zIndex(100)
+                }
             }
-            .navigationBarHidden(true)
+            .navigationTitle("🏆 Home")
+            .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
             Task {
@@ -2041,10 +2432,10 @@ struct ZineHeader: View {
                         Text("HIT RATE")
                             .font(.custom("ComicSansMS-Bold", size: 12))
                             .tracking(2)
-                            .foregroundColor(HRTheme.blue)
+                            .foregroundColor(HRTheme.gold)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 3)
-                            .background(HRTheme.gold)
+                            .background(HRTheme.blue)
                             .rotationEffect(.degrees(-5))
                             .offset(y: 35) // Slightly lower position
                             .shadow(color: Color.black.opacity(0.3), radius: 1, x: 1, y: 1)
@@ -2187,3 +2578,173 @@ struct ZineAvatarView: View {
         }
     }
 }
+
+// Add VoteConfirmationView after ConfettiView
+struct VoteConfirmationView: View {
+    var teamName: String
+    @State private var offset: CGFloat = 500
+    @State private var opacity: Double = 0
+    @State private var scale: CGFloat = 0.8
+    @State private var rotate: Double = -5
+    @State private var showConfetti = false
+    @State private var pulseEffect = false
+    
+    var body: some View {
+        ZStack {
+            // Background confetti burst
+            if showConfetti {
+                ConfettiView()
+                    .frame(width: 300, height: 300)
+            }
+            
+            VStack(spacing: 16) {
+                // Team logo if available
+                if let logoImage = TeamLogoManager.shared.logoImage(
+                    for: getTeamAbbreviation(from: teamName),
+                    sportType: getSportType(from: teamName)
+                ) {
+                    logoImage
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                        .padding(.top, 8)
+                        .scaleEffect(pulseEffect ? 1.1 : 1.0)
+                        .shadow(color: HRTheme.goldShadow.opacity(0.6), radius: pulseEffect ? 15 : 5, x: 0, y: 0)
+                }
+                
+                // Victory icon
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(HRTheme.gold)
+                    .shadow(color: HRTheme.goldShadow.opacity(0.6), radius: 8, x: 0, y: 4)
+                    .scaleEffect(pulseEffect ? 1.1 : 1.0)
+                
+                // Success message
+                Text("VOTE CONFIRMED!")
+                    .font(.custom("ComicSansMS-Bold", size: 22))
+                    .foregroundColor(HRTheme.gold)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Rectangle()
+                            .fill(HRTheme.blue.opacity(0.3))
+                            .rotationEffect(.degrees(rotate))
+                    )
+                    .rotationEffect(.degrees(rotate))
+                
+                Text("You've picked")
+                    .font(HRTheme.Fonts.body)
+                    .foregroundColor(Color.gray)
+                
+                Text(teamName)
+                    .font(.custom("ComicSansMS-Bold", size: 28))
+                    .foregroundColor(HRTheme.blue)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .shadow(color: HRTheme.blueShadow.opacity(0.6), radius: 2, x: 0, y: 2)
+                    .scaleEffect(pulseEffect ? 1.05 : 1.0)
+                
+                Text("Good luck! 🍀")
+                    .font(HRTheme.Fonts.body)
+                    .foregroundColor(Color.gray)
+                    .padding(.top, 4)
+            }
+            .padding(30)
+            .background(
+                ZStack {
+                    // Shadow layer
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.black.opacity(0.2))
+                        .blur(radius: 8)
+                        .offset(x: 0, y: 8)
+                    
+                    // Background with radial effect
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            RadialGradient(
+                                gradient: Gradient(colors: [Color.white, Color.white.opacity(0.9)]),
+                                center: .center,
+                                startRadius: 50,
+                                endRadius: 200
+                            )
+                        )
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            gradient: Gradient(colors: [HRTheme.gold, HRTheme.goldBorder]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 4
+                    )
+                    .brightness(pulseEffect ? 0.2 : 0)
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 15, x: 0, y: 5)
+            .offset(y: offset)
+            .opacity(opacity)
+            .scaleEffect(scale)
+            .onAppear {
+                // Create a dramatic entrance
+                withAnimation(Animation.spring(response: 0.6, dampingFraction: 0.7)) {
+                    offset = 0
+                    opacity = 1
+                    scale = 1.0
+                }
+                
+                // Delay and then show confetti
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showConfetti = true
+                }
+                
+                // Start pulsing effect
+                withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    pulseEffect = true
+                }
+                
+                // Subtle wiggle
+                withAnimation(Animation.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    rotate = 2
+                }
+                
+                // Add haptic feedback to emphasize importance
+                let notificationFeedback = UINotificationFeedbackGenerator()
+                notificationFeedback.notificationOccurred(.success)
+            }
+        }
+    }
+    
+    // Helper functions to get team abbreviation and sport type
+    private func getTeamAbbreviation(from teamName: String) -> String {
+        // Special cases for teams with non-standard abbreviations
+        if teamName.contains("Warriors") {
+            return "GS"
+        }
+        
+        // Standard abbreviation logic
+        let words = teamName.components(separatedBy: " ")
+        if words.count >= 2 {
+            return String(words[0].prefix(1)) + String(words[1].prefix(2)).uppercased()
+        }
+        return String(teamName.prefix(3)).uppercased()
+    }
+    
+    private func getSportType(from teamName: String) -> SportsService.SportType {
+        let nbaTeams = [
+            "Hawks", "Celtics", "Nets", "Hornets", "Bulls", "Cavaliers", "Mavericks", 
+            "Nuggets", "Pistons", "Warriors", "Rockets", "Pacers", "Clippers", "Lakers", 
+            "Grizzlies", "Heat", "Bucks", "Timberwolves", "Pelicans", "Knicks", "Thunder", 
+            "Magic", "76ers", "Suns", "Trail Blazers", "Kings", "Spurs", "Raptors", "Jazz", "Wizards"
+        ]
+        
+        for team in nbaTeams {
+            if teamName.contains(team) {
+                return .nba
+            }
+        }
+        return .mlb
+    }
+}
+
