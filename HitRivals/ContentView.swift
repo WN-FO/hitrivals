@@ -984,6 +984,7 @@ struct DashboardView: View {
     @StateObject private var gamesViewModel = GamesViewModel()
     @StateObject private var friendsViewModel = FriendsViewModel()
     @State private var animateHeader = false
+    @State private var totalHits = 28 // Placeholder for total hits
     
     var body: some View {
         NavigationView {
@@ -992,228 +993,154 @@ struct DashboardView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Custom Header
-                    VStack {
+                    // Zine-style header
+                    ZineHeader(
+                        hitRate: profileViewModel.hitRate,
+                        username: profileViewModel.profile?.username ?? "User",
+                        totalHits: totalHits,
+                        friendCount: friendsViewModel.friends.count,
+                        profileImage: profileViewModel.avatarImage,
+                        profilePlaceholder: profileViewModel.profile?.username ?? "User"
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    
+                    // TODAY'S PICKS section
+                    VStack(spacing: 12) {
                         HStack {
-                            AnimatedText(text: "HIT RIVALS", baseSize: 28)
+                            Image(systemName: "trophy.fill")
+                                .foregroundColor(HRTheme.gold)
+                                .font(.system(size: 20))
+                            
+                            Text("TODAY'S PICKS")
+                                .font(.custom("ComicSansMS-Bold", size: 20))
+                                .foregroundColor(HRTheme.blue)
                             
                             Spacer()
-                            
-                            BouncyEmoji(emoji: "⚾")
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        Text("PLAY THE RIVALRY")
-                            .font(.custom("ComicSansMS-Bold", size: 16))
-                            .tracking(2)
-                            .padding(8)
-                            .frame(maxWidth: .infinity)
-                            .background(HRTheme.gold)
-                            .foregroundColor(HRTheme.blue)
-                            .offset(y: animateHeader ? 0 : -40)
-                            .opacity(animateHeader ? 1 : 0)
-                            .onAppear {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.6)) {
-                                    animateHeader = true
-                                }
-                            }
-                    }
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            // User stats
-                            HStack(spacing: 12) {
-                                AvatarView(
-                                    image: profileViewModel.avatarImage,
-                                    placeholder: profileViewModel.profile?.username ?? "User",
-                                    size: 60
-                                )
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(profileViewModel.profile?.username ?? "User")
-                                        .font(HRTheme.Fonts.subtitle)
-                                    
-                                    HStack(spacing: 4) {
-                                        Text("\(Int(profileViewModel.hitRate))%")
-                                            .font(.custom("ComicSansMS-Bold", size: 18))
-                                            .foregroundColor(HRTheme.red)
-                                        
-                                        Text("HIT RATE")
-                                            .font(.custom("ComicSansMS", size: 14))
-                                            .foregroundColor(HRTheme.blue)
+                        // Sport selector
+                        HStack(spacing: 0) {
+                            Button(action: {
+                                if gamesViewModel.selectedSport != .mlb {
+                                    gamesViewModel.selectedSport = .mlb
+                                    Task {
+                                        if let user = try? await SupabaseService.shared.getUser() {
+                                            gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                        }
                                     }
                                 }
-                                
-                                Spacer()
-                                
-                                VStack {
-                                    Text("RANK")
-                                        .font(.custom("ComicSansMS", size: 12))
-                                        .foregroundColor(HRTheme.blue)
-                                    
-                                    Text("#\(profileViewModel.rank ?? 0)")
-                                        .font(.custom("ComicSansMS-Bold", size: 24))
-                                        .foregroundColor(HRTheme.gold)
+                            }) {
+                                HStack {
+                                    Image(systemName: "baseball.fill")
+                                    Text("MLB")
+                                        .font(.custom("ComicSansMS-Bold", size: 16))
                                 }
-                                .padding(12)
-                                .background(HRTheme.blue)
-                                .cornerRadius(12)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(gamesViewModel.selectedSport == .mlb ? .white : HRTheme.blue)
+                                .background(gamesViewModel.selectedSport == .mlb ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                .clipShape(
+                                    RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
+                                )
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedCorner(radius: 9, corners: [.topLeft, .bottomLeft])
                                         .stroke(HRTheme.blueBorder, lineWidth: 3)
                                 )
                             }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(HRTheme.blueBorder, lineWidth: 3)
-                            )
-                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
                             
-                            // Friends section
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("⭐ FRIENDS")
-                                    .font(.custom("ComicSansMS-Bold", size: 16))
-                                    .foregroundColor(HRTheme.blue)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(HRTheme.gold)
-                                    .cornerRadius(8)
-                                
-                                FriendsListView(friends: friendsViewModel.friends)
-                            }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(HRTheme.blueBorder, lineWidth: 3)
-                            )
-                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
-                            
-                            // Sport selector toggle
-                            VStack(spacing: 12) {
-                                Text("🏆 TODAY'S PICKS")
-                                    .font(.custom("ComicSansMS-Bold", size: 20))
-                                    .foregroundColor(HRTheme.blue)
-                                
-                                HStack(spacing: 0) {
-                                    Button(action: {
-                                        if gamesViewModel.selectedSport != .mlb {
-                                            gamesViewModel.selectedSport = .mlb
-                                            Task {
-                                                if let user = try? await SupabaseService.shared.getUser() {
-                                                    gamesViewModel.fetchGames(userId: user.id.uuidString)
-                                                }
-                                            }
+                            Button(action: {
+                                if gamesViewModel.selectedSport != .nba {
+                                    gamesViewModel.selectedSport = .nba
+                                    Task {
+                                        if let user = try? await SupabaseService.shared.getUser() {
+                                            gamesViewModel.fetchGames(userId: user.id.uuidString)
                                         }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "baseball.fill")
-                                            Text("MLB")
-                                                .font(.custom("ComicSansMS-Bold", size: 16))
-                                        }
-                                        .padding(.vertical, 12)
-                                        .frame(maxWidth: .infinity)
-                                        .foregroundColor(gamesViewModel.selectedSport == .mlb ? .white : HRTheme.blue)
-                                        .background(gamesViewModel.selectedSport == .mlb ? HRTheme.blue : HRTheme.gold.opacity(0.3))
-                                        .cornerRadius(12, corners: [.topLeft, .bottomLeft])
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(HRTheme.blueBorder, lineWidth: 3)
-                                                .cornerRadius(12, corners: [.topLeft, .bottomLeft])
-                                        )
                                     }
-                                    
-                                    Button(action: {
-                                        if gamesViewModel.selectedSport != .nba {
-                                            gamesViewModel.selectedSport = .nba
-                                            Task {
-                                                if let user = try? await SupabaseService.shared.getUser() {
-                                                    gamesViewModel.fetchGames(userId: user.id.uuidString)
-                                                }
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "basketball.fill")
+                                    Text("NBA")
+                                        .font(.custom("ComicSansMS-Bold", size: 16))
+                                }
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(gamesViewModel.selectedSport == .nba ? .white : HRTheme.blue)
+                                .background(gamesViewModel.selectedSport == .nba ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                .clipShape(
+                                    RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
+                                )
+                                .overlay(
+                                    RoundedCorner(radius: 9, corners: [.topRight, .bottomRight])
+                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
+                                )
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    ScrollView {
+                        // Games list
+                        if gamesViewModel.isLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(2)
+                                    .padding(40)
+                                Spacer()
+                            }
+                        } else if gamesViewModel.games.isEmpty {
+                            VStack {
+                                Image(systemName: gamesViewModel.selectedSport == .mlb ? "baseball" : "basketball")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(HRTheme.blue)
+                                    .padding()
+                                
+                                Text("NO GAMES TODAY")
+                                    .font(.custom("ComicSansMS-Bold", size: 18))
+                                    .foregroundColor(HRTheme.blue)
+                                
+                                Text("Check back later!")
+                                    .font(HRTheme.Fonts.body)
+                                    .foregroundColor(HRTheme.blue.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .padding()
+                            }
+                            .padding(30)
+                            .background(Color.white)
+                            .cornerRadius(20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(HRTheme.blueBorder, lineWidth: 3)
+                            )
+                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            .padding(.horizontal)
+                            .padding(.top, 20)
+                        } else {
+                            VStack(spacing: 20) {
+                                ForEach(gamesViewModel.games) { game in
+                                    GameCardView(game: game) { gameId, teamChoice in
+                                        Task {
+                                            if let user = try? await SupabaseService.shared.getUser() {
+                                                gamesViewModel.vote(
+                                                    userId: user.id.uuidString,
+                                                    gameId: gameId,
+                                                    teamChoice: teamChoice
+                                                )
                                             }
                                         }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "basketball.fill")
-                                            Text("NBA")
-                                                .font(.custom("ComicSansMS-Bold", size: 16))
-                                        }
-                                        .padding(.vertical, 12)
-                                        .frame(maxWidth: .infinity)
-                                        .foregroundColor(gamesViewModel.selectedSport == .nba ? .white : HRTheme.blue)
-                                        .background(gamesViewModel.selectedSport == .nba ? HRTheme.blue : HRTheme.gold.opacity(0.3))
-                                        .cornerRadius(12, corners: [.topRight, .bottomRight])
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(HRTheme.blueBorder, lineWidth: 3)
-                                                .cornerRadius(12, corners: [.topRight, .bottomRight])
-                                        )
                                     }
                                 }
                             }
                             .padding(.horizontal)
-                            
-                            // Games list
-                            if gamesViewModel.isLoading {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                        .scaleEffect(2)
-                                        .padding(40)
-                                    Spacer()
-                                }
-                            } else if gamesViewModel.games.isEmpty {
-                                VStack {
-                                    Image(systemName: gamesViewModel.selectedSport == .mlb ? "baseball" : "basketball")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(HRTheme.blue)
-                                        .padding()
-                                    
-                                    Text("NO GAMES TODAY")
-                                        .font(.custom("ComicSansMS-Bold", size: 18))
-                                        .foregroundColor(HRTheme.blue)
-                                    
-                                    Text("Check back later!")
-                                        .font(HRTheme.Fonts.body)
-                                        .foregroundColor(HRTheme.blue.opacity(0.8))
-                                        .multilineTextAlignment(.center)
-                                        .padding()
-                                }
-                                .padding(30)
-                                .background(Color.white)
-                                .cornerRadius(20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
-                                )
-                                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
-                                .padding(.horizontal)
-                            } else {
-                                VStack(spacing: 20) {
-                                    ForEach(gamesViewModel.games) { game in
-                                        GameCardView(game: game) { gameId, teamChoice in
-                                            Task {
-                                                if let user = try? await SupabaseService.shared.getUser() {
-                                                    gamesViewModel.vote(
-                                                        userId: user.id.uuidString,
-                                                        gameId: gameId,
-                                                        teamChoice: teamChoice
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
+                            .padding(.top, 12)
                         }
-                        .padding(.bottom, 30)
                     }
+                    .padding(.top, 8)
                 }
                 
                 if profileViewModel.isLoading {
@@ -2013,5 +1940,250 @@ struct RoundedCorner: Shape {
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
         return Path(path.cgPath)
+    }
+}
+
+// New Zine-Style Components
+struct ZineHeader: View {
+    var hitRate: Double
+    var username: String
+    var totalHits: Int
+    var friendCount: Int
+    var profileImage: UIImage?
+    var profilePlaceholder: String
+    
+    @State private var isGlitching = false
+    @State private var glitchOffset: CGFloat = 0
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(alignment: .top) {
+                // Logo with subtle glow effect (no shimmer)
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 95)
+                    .overlay(
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 95)
+                            .blur(radius: 3)
+                            .opacity(0.3)
+                            .offset(x: 4, y: 4)
+                    )
+                    .padding(.top, 4)
+                
+                Spacer()
+                
+                // Profile & Hit Rate section with swapped positions and fixed spacing
+                HStack(alignment: .top, spacing: 30) { // Increased spacing between avatar and hit rate
+                    // Profile avatar with username underneath - now on left
+                    VStack(spacing: 6) {
+                        ZineAvatarView(
+                            image: profileImage,
+                            placeholder: profilePlaceholder,
+                            size: 75
+                        )
+                        
+                        Text(username) // Username with no background
+                            .font(.custom("ComicSansMS-Bold", size: 15))
+                            .foregroundColor(HRTheme.blue)
+                            .lineLimit(1)
+                    }
+                    
+                    // Hit Rate as the focal point - now on right
+                    ZStack {
+                        // Background layers for depth
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 90, height: 80)
+                            .shadow(color: Color.black.opacity(0.2), radius: 0, x: 3, y: 3)
+                        
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 90, height: 80)
+                            .overlay(
+                                Rectangle()
+                                    .stroke(HRTheme.red, lineWidth: 2) // Red border around hit rate box
+                                    .frame(width: 90, height: 80)
+                            )
+                        
+                        // Hit rate percentage with stronger styling
+                        Text("\(Int(hitRate))%")
+                            .font(.custom("ComicSansMS-Bold", size: 44))
+                            .tracking(-1)
+                            .foregroundColor(HRTheme.red)
+                            .shadow(color: Color.black.opacity(0.4), radius: 0, x: 1, y: 1)
+                            .scaleEffect(x: isGlitching ? 1.05 : 1, y: 1)
+                            .offset(x: glitchOffset)
+                            .onAppear {
+                                // Slower animation
+                                withAnimation(Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(3)) {
+                                    isGlitching = true
+                                }
+                                
+                                // Random glitch effect with slower timing
+                                Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        glitchOffset = CGFloat.random(in: -2...2)
+                                    }
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            glitchOffset = 0
+                                        }
+                                    }
+                                }
+                            }
+                        
+                        // "HIT RATE" label with slightly lower position
+                        Text("HIT RATE")
+                            .font(.custom("ComicSansMS-Bold", size: 12))
+                            .tracking(2)
+                            .foregroundColor(HRTheme.blue)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(HRTheme.gold)
+                            .rotationEffect(.degrees(-5))
+                            .offset(y: 35) // Slightly lower position
+                            .shadow(color: Color.black.opacity(0.3), radius: 1, x: 1, y: 1)
+                    }
+                }
+                .padding(.trailing, 5) // Added to prevent right elements from being too close to edge
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            
+            // Stats strip with color from palette
+            HStack {
+                // Left stat: Hits
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(HRTheme.white)
+                        .font(.system(size: 22))
+                        
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("HITS")
+                            .font(.custom("ComicSansMS", size: 12))
+                            .foregroundColor(HRTheme.white.opacity(0.8))
+                        
+                        Text("\(totalHits)")
+                            .font(.custom("ComicSansMS-Bold", size: 20))
+                            .foregroundColor(HRTheme.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                
+                // Right stat: Friends
+                HStack(spacing: 10) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundColor(HRTheme.white)
+                        .font(.system(size: 22))
+                        
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("FRIENDS")
+                            .font(.custom("ComicSansMS", size: 12))
+                            .foregroundColor(HRTheme.white.opacity(0.8))
+                        
+                        Text("\(friendCount)")
+                            .font(.custom("ComicSansMS-Bold", size: 20))
+                            .foregroundColor(HRTheme.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .padding(.horizontal, 20)
+            .background(HRTheme.blue.opacity(0.9)) // Using blue from our palette
+            .cornerRadius(8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct ZineStatsBox: View {
+    var icon: String
+    var label: String
+    var value: String
+    var color: Color
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.system(size: 14))
+            
+            VStack(alignment: .leading, spacing: 0) {
+                Text(label)
+                    .font(.custom("ComicSansMS", size: 10))
+                    .foregroundColor(Color.gray)
+                
+                Text(value)
+                    .font(.custom("ComicSansMS-Bold", size: 16))
+                    .lineLimit(1)
+                    .foregroundColor(.black)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct ZineAvatarView: View {
+    var image: UIImage?
+    var placeholder: String
+    var size: CGFloat
+    @State private var rotate = false
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white)
+                .frame(width: size + 8, height: size + 8)
+                .shadow(color: HRTheme.blueBorder.opacity(0.4), radius: 4, x: 0, y: 0)
+            
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(HRTheme.blueBorder, lineWidth: 3)
+                    )
+                    .rotationEffect(.degrees(rotate ? 2 : 0))
+                    .onAppear {
+                        withAnimation(Animation.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                            rotate = true
+                        }
+                    }
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(HRTheme.blue.opacity(0.2))
+                    
+                    Text(placeholder.prefix(2).uppercased())
+                        .font(.custom("ComicSansMS-Bold", size: size * 0.4))
+                        .foregroundColor(HRTheme.blue)
+                }
+                .frame(width: size, height: size)
+                .overlay(
+                    Circle()
+                        .stroke(HRTheme.blueBorder, lineWidth: 3)
+                )
+                .rotationEffect(.degrees(rotate ? 2 : 0))
+                .onAppear {
+                    withAnimation(Animation.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                        rotate = true
+                    }
+                }
+            }
+        }
     }
 }
