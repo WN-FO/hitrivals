@@ -1,23 +1,31 @@
 import Foundation
 
-/// Service for fetching MLB game data from Tank01 API
-class MLBService {
-    static let shared = MLBService()
+/// Service for fetching MLB and NBA game data from Tank01 API
+class SportsService {
+    static let shared = SportsService()
     
-    private let baseURL = "https://tank01-mlb-live-in-game-real-time-statistics.p.rapidapi.com"
+    enum SportType {
+        case mlb
+        case nba
+    }
+    
+    private let mlbBaseURL = "https://tank01-mlb-live-in-game-real-time-statistics.p.rapidapi.com"
+    private let nbaBaseURL = "https://tank01-fantasy-stats.p.rapidapi.com"
     private let apiKey = "bc4fa015f9msh97c01d2babd5043p1cda77jsnea2e8fd2690f"
     
     private init() {}
     
     /// Fetch today's MLB schedule
     func fetchTodaysMLBSchedule(completion: @escaping ([Game]?) -> Void) {
-        fetchMLBScheduleForDate(date: Date(), completion: completion)
+        fetchMLBSchedule(date: Date(), attempts: 3, completion: completion)
     }
     
-    /// Fetch MLB schedule for a specific date
-    func fetchMLBScheduleForDate(date: Date, completion: @escaping ([Game]?) -> Void) {
-        fetchMLBSchedule(date: date, attempts: 3, completion: completion)
+    /// Fetch today's NBA schedule
+    func fetchTodaysNBASchedule(completion: @escaping ([Game]?) -> Void) {
+        fetchNBASchedule(date: Date(), attempts: 3, completion: completion)
     }
+    
+    // MARK: - MLB API Methods
     
     /// Fetch MLB schedule with retry mechanism
     private func fetchMLBSchedule(date: Date, attempts: Int, completion: @escaping ([Game]?) -> Void) {
@@ -38,7 +46,7 @@ class MLBService {
         print("Fetching MLB games for date: \(dateString)")
         
         // Construct the URL
-        guard let url = URL(string: baseURL + endpoint) else {
+        guard let url = URL(string: mlbBaseURL + endpoint) else {
             print("Error: invalid URL")
             completion(nil)
             return
@@ -103,7 +111,7 @@ class MLBService {
                 // First try to parse as the expected structure
                 do {
                     let apiResponse = try decoder.decode(MLBApiResponse.self, from: data)
-                    let games = self.convertApiGamesToGames(apiResponse.body)
+                    let games = self.convertMLBApiGamesToGames(apiResponse.body)
                     completion(games)
                     return
                 } catch {
@@ -112,7 +120,7 @@ class MLBService {
                     // Try to parse as a direct array of games
                     do {
                         let apiGames = try decoder.decode([MLBApiGame].self, from: data)
-                        let games = self.convertApiGamesToGames(apiGames)
+                        let games = self.convertMLBApiGamesToGames(apiGames)
                         completion(games)
                         return
                     } catch {
@@ -124,7 +132,7 @@ class MLBService {
                             if let bodyData = responseDict?["body"] as? [[String: Any]] {
                                 let bodyJsonData = try JSONSerialization.data(withJSONObject: bodyData)
                                 let apiGames = try decoder.decode([MLBApiGame].self, from: bodyJsonData)
-                                let games = self.convertApiGamesToGames(apiGames)
+                                let games = self.convertMLBApiGamesToGames(apiGames)
                                 completion(games)
                                 return
                             }
@@ -158,8 +166,132 @@ class MLBService {
         task.resume()
     }
     
-    /// Convert API games to app Game model
-    private func convertApiGamesToGames(_ apiGames: [MLBApiGame]) -> [Game] {
+    // MARK: - NBA API Methods
+    
+    /// Fetch NBA schedule with retry mechanism
+    private func fetchNBASchedule(date: Date, attempts: Int, completion: @escaping ([Game]?) -> Void) {
+        guard attempts > 0 else {
+            print("No more retry attempts left for NBA API")
+            completion(nil)
+            return
+        }
+        
+        // Get the date in YYYYMMDD format
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: date)
+        
+        // API endpoint to get games for the date
+        let endpoint = "/getNBAGamesForDate?gameDate=\(dateString)"
+        
+        print("Fetching NBA games for date: \(dateString)")
+        
+        // Construct the URL
+        guard let url = URL(string: nbaBaseURL + endpoint) else {
+            print("Error: invalid URL")
+            completion(nil)
+            return
+        }
+        
+        // Create the request with headers
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue(apiKey, forHTTPHeaderField: "x-rapidapi-key")
+        request.addValue("tank01-fantasy-stats.p.rapidapi.com", forHTTPHeaderField: "x-rapidapi-host")
+        
+        // Create the data task
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            // Check for HTTP response status code
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                print("HTTP Error: \(httpResponse.statusCode)")
+                
+                // Wait and retry with exponential backoff
+                let delay = pow(2.0, Double(3 - attempts)) // 1, 2, 4 seconds
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                    self.fetchNBASchedule(date: date, attempts: attempts - 1, completion: completion)
+                }
+                return
+            }
+            
+            // Handle errors
+            if let error = error {
+                print("Error fetching NBA data: \(error)")
+                
+                // Wait and retry
+                let delay = pow(2.0, Double(3 - attempts)) // 1, 2, 4 seconds
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                    self.fetchNBASchedule(date: date, attempts: attempts - 1, completion: completion)
+                }
+                return
+            }
+            
+            // Ensure we have data
+            guard let data = data else {
+                print("No data returned from NBA API")
+                
+                // Wait and retry
+                let delay = pow(2.0, Double(3 - attempts)) // 1, 2, 4 seconds
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                    self.fetchNBASchedule(date: date, attempts: attempts - 1, completion: completion)
+                }
+                return
+            }
+            
+            do {
+                // For debugging: print the response
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("NBA API Response (first 200 chars): \(String(jsonString.prefix(200)))")
+                }
+                
+                // Parse the JSON response
+                let decoder = JSONDecoder()
+                
+                // Parse as the expected structure
+                do {
+                    let apiResponse = try decoder.decode(NBAApiResponse.self, from: data)
+                    let games = self.convertNBAApiGamesToGames(apiResponse.body)
+                    completion(games)
+                    return
+                } catch {
+                    print("Could not decode as NBAApiResponse: \(error)")
+                    
+                    // Try another approach with direct deserialization
+                    do {
+                        let responseDict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                        if let bodyData = responseDict?["body"] as? [[String: Any]] {
+                            let bodyJsonData = try JSONSerialization.data(withJSONObject: bodyData)
+                            let apiGames = try decoder.decode([NBAApiGame].self, from: bodyJsonData)
+                            let games = self.convertNBAApiGamesToGames(apiGames)
+                            completion(games)
+                            return
+                        }
+                    } catch {
+                        print("All NBA parsing attempts failed: \(error)")
+                        completion(nil)
+                    }
+                }
+            } catch {
+                print("Error handling NBA data: \(error)")
+                
+                // Wait and retry
+                let delay = pow(2.0, Double(3 - attempts)) // 1, 2, 4 seconds
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                    self.fetchNBASchedule(date: date, attempts: attempts - 1, completion: completion)
+                }
+            }
+        }
+        
+        // Start the network request
+        task.resume()
+    }
+    
+    // MARK: - Data Conversion Methods
+    
+    /// Convert MLB API games to app Game model
+    private func convertMLBApiGamesToGames(_ apiGames: [MLBApiGame]) -> [Game] {
         var games = [Game]()
         
         for apiGame in apiGames {
@@ -200,16 +332,64 @@ class MLBService {
                 gameId = abs(apiGame.gameID.hashValue % 1000000)
             }
             
-            print("Generated game ID: \(gameId) from gameID: \(apiGame.gameID)")
-            
             let game = Game(
                 id: gameId,
-                homeTeam: getFullTeamName(apiGame.home),
-                awayTeam: getFullTeamName(apiGame.away),
+                homeTeam: getMLBFullTeamName(apiGame.home),
+                awayTeam: getMLBFullTeamName(apiGame.away),
                 homeTeamAbbr: apiGame.home,
                 awayTeamAbbr: apiGame.away,
                 startTime: startTime,
-                status: "scheduled"  // Default status
+                status: "scheduled",  // Default status
+                sportType: .mlb
+            )
+            
+            games.append(game)
+        }
+        
+        return games
+    }
+    
+    /// Convert NBA API games to app Game model
+    private func convertNBAApiGamesToGames(_ apiGames: [NBAApiGame]) -> [Game] {
+        var games = [Game]()
+        
+        for apiGame in apiGames {
+            // Set default game time to 7:30 PM since API doesn't provide times
+            let calendar = Calendar.current
+            var startTimeComponents = calendar.dateComponents([.year, .month, .day], from: Date())
+            startTimeComponents.hour = 19
+            startTimeComponents.minute = 30
+            let startTime = calendar.date(from: startTimeComponents) ?? Date()
+            
+            // Create a unique game ID
+            let gameId: Int
+            let components = apiGame.gameID.split(separator: "_")
+            if components.count >= 2 {
+                let dateComponent = components[0]
+                let teamsComponent = components[1]
+                
+                // Create a hash from the teams string
+                let teamsHash = abs(teamsComponent.hashValue % 10000)
+                
+                // Combine with a unique ID using last 4 digits of date + teams hash
+                if let dateInt = Int(dateComponent.suffix(4)) {
+                    gameId = (dateInt * 10000) + teamsHash + 5000000 // Add offset to avoid MLB ID collisions
+                } else {
+                    gameId = teamsHash + 5000000 + Int.random(in: 1000...9999)
+                }
+            } else {
+                gameId = abs(apiGame.gameID.hashValue % 1000000) + 5000000
+            }
+            
+            let game = Game(
+                id: gameId,
+                homeTeam: getNBAFullTeamName(apiGame.home),
+                awayTeam: getNBAFullTeamName(apiGame.away),
+                homeTeamAbbr: apiGame.home,
+                awayTeamAbbr: apiGame.away,
+                startTime: startTime,
+                status: "scheduled",  // Default status
+                sportType: .nba
             )
             
             games.append(game)
@@ -255,8 +435,8 @@ class MLBService {
         return calendar.date(from: components)
     }
     
-    /// Get full team name from abbreviation
-    private func getFullTeamName(_ abbreviation: String) -> String {
+    /// Get full MLB team name from abbreviation
+    private func getMLBFullTeamName(_ abbreviation: String) -> String {
         let teamNames: [String: String] = [
             "ARI": "Arizona Diamondbacks",
             "ATL": "Atlanta Braves",
@@ -293,6 +473,44 @@ class MLBService {
         return teamNames[abbreviation] ?? abbreviation
     }
     
+    /// Get full NBA team name from abbreviation
+    private func getNBAFullTeamName(_ abbreviation: String) -> String {
+        let teamNames: [String: String] = [
+            "ATL": "Atlanta Hawks",
+            "BOS": "Boston Celtics",
+            "BKN": "Brooklyn Nets",
+            "CHA": "Charlotte Hornets",
+            "CHI": "Chicago Bulls",
+            "CLE": "Cleveland Cavaliers",
+            "DAL": "Dallas Mavericks",
+            "DEN": "Denver Nuggets",
+            "DET": "Detroit Pistons",
+            "GSW": "Golden State Warriors",
+            "HOU": "Houston Rockets",
+            "IND": "Indiana Pacers",
+            "LAC": "LA Clippers",
+            "LAL": "Los Angeles Lakers",
+            "MEM": "Memphis Grizzlies",
+            "MIA": "Miami Heat",
+            "MIL": "Milwaukee Bucks",
+            "MIN": "Minnesota Timberwolves",
+            "NOP": "New Orleans Pelicans",
+            "NYK": "New York Knicks",
+            "OKC": "Oklahoma City Thunder",
+            "ORL": "Orlando Magic",
+            "PHI": "Philadelphia 76ers",
+            "PHO": "Phoenix Suns",
+            "POR": "Portland Trail Blazers",
+            "SAC": "Sacramento Kings",
+            "SAS": "San Antonio Spurs",
+            "TOR": "Toronto Raptors",
+            "UTA": "Utah Jazz",
+            "WAS": "Washington Wizards"
+        ]
+        
+        return teamNames[abbreviation] ?? abbreviation
+    }
+    
     // MARK: - Mock Data
     
     /// Get mock MLB games for testing
@@ -305,7 +523,8 @@ class MLBService {
                 homeTeamAbbr: "NYY",
                 awayTeamAbbr: "BOS",
                 startTime: Calendar.current.date(bySettingHour: 19, minute: 5, second: 0, of: Date()) ?? Date(),
-                status: "scheduled"
+                status: "scheduled",
+                sportType: .mlb
             ),
             Game(
                 id: 2,
@@ -314,7 +533,8 @@ class MLBService {
                 homeTeamAbbr: "STL",
                 awayTeamAbbr: "CHC",
                 startTime: Calendar.current.date(bySettingHour: 20, minute: 15, second: 0, of: Date()) ?? Date(),
-                status: "scheduled"
+                status: "scheduled",
+                sportType: .mlb
             ),
             Game(
                 id: 3,
@@ -323,7 +543,44 @@ class MLBService {
                 homeTeamAbbr: "LAD",
                 awayTeamAbbr: "SF",
                 startTime: Calendar.current.date(bySettingHour: 22, minute: 10, second: 0, of: Date()) ?? Date(),
-                status: "scheduled"
+                status: "scheduled",
+                sportType: .mlb
+            )
+        ]
+    }
+    
+    /// Get mock NBA games for testing
+    func getMockNBAGames() -> [Game] {
+        return [
+            Game(
+                id: 5000001,
+                homeTeam: "Los Angeles Lakers",
+                awayTeam: "Boston Celtics",
+                homeTeamAbbr: "LAL",
+                awayTeamAbbr: "BOS",
+                startTime: Calendar.current.date(bySettingHour: 19, minute: 30, second: 0, of: Date()) ?? Date(),
+                status: "scheduled",
+                sportType: .nba
+            ),
+            Game(
+                id: 5000002,
+                homeTeam: "Golden State Warriors",
+                awayTeam: "Brooklyn Nets",
+                homeTeamAbbr: "GSW",
+                awayTeamAbbr: "BKN",
+                startTime: Calendar.current.date(bySettingHour: 20, minute: 0, second: 0, of: Date()) ?? Date(),
+                status: "scheduled",
+                sportType: .nba
+            ),
+            Game(
+                id: 5000003,
+                homeTeam: "Miami Heat",
+                awayTeam: "Chicago Bulls",
+                homeTeamAbbr: "MIA",
+                awayTeamAbbr: "CHI",
+                startTime: Calendar.current.date(bySettingHour: 18, minute: 30, second: 0, of: Date()) ?? Date(),
+                status: "scheduled",
+                sportType: .nba
             )
         ]
     }
@@ -365,4 +622,18 @@ struct MLBApiGame: Codable {
             let playerID: String
         }
     }
+}
+
+struct NBAApiResponse: Codable {
+    let statusCode: Int
+    let body: [NBAApiGame]
+}
+
+struct NBAApiGame: Codable {
+    let gameID: String
+    let teamIDAway: String
+    let away: String
+    let gameDate: String
+    let teamIDHome: String
+    let home: String
 } 

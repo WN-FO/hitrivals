@@ -10,6 +10,170 @@ import PhotosUI
 import Supabase
 import Combine
 
+// MARK: - Theme Manager
+import SwiftUI
+import PhotosUI
+import Supabase
+import Combine
+
+// Custom Theme Manager
+struct HRTheme {
+    // Colors based on provided palette
+    static let blue = Color(hex: "#002868")
+    static let blueBorder = Color(hex: "#001845")
+    static let blueShadow = Color(hex: "#001430")
+    
+    static let red = Color(hex: "#bf0d3e")
+    static let redBorder = Color(hex: "#a00a34")
+    static let redShadow = Color(hex: "#8f0930")
+    
+    static let white = Color.white
+    static let whiteBorder = Color(hex: "#e0e0e0")
+    static let whiteShadow = Color(hex: "#cccccc")
+    
+    static let gold = Color(hex: "#FFD700")
+    static let goldBorder = Color(hex: "#e6c200")
+    static let goldShadow = Color(hex: "#ccac00")
+    
+    // Text colors
+    static let blueText = Color.white
+    static let redText = Color.white
+    static let whiteText = Color(hex: "#002868")
+    static let goldText = Color(hex: "#002868")
+    
+    // Background
+    static let background = Color(hex: "#f0f0f0")
+    
+    // Accent colors for variety
+    static let neonGreen = Color(hex: "#ADFF2F")
+    static let hotPink = Color(hex: "#FF69B4")
+    
+    // Fonts
+    struct Fonts {
+        static let title = Font.custom("ComicSansMS-Bold", size: 24)
+        static let subtitle = Font.custom("ComicSansMS-Bold", size: 18)
+        static let body = Font.custom("ComicSansMS", size: 16)
+        static let caption = Font.custom("ComicSansMS", size: 12)
+    }
+    
+    // Animations
+    static let springAnimation = Animation.spring(response: 0.4, dampingFraction: 0.7)
+    static let defaultAnimation = Animation.easeInOut(duration: 0.3)
+}
+
+// Helper for hex colors
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+    }
+}
+
+// Extension for button style
+struct CPFMButtonStyle: ButtonStyle {
+    var bgColor: Color = HRTheme.blue
+    var borderColor: Color = HRTheme.blueBorder
+    var shadowColor: Color = HRTheme.blueShadow
+    var textColor: Color = HRTheme.blueText
+    var isLarge: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(HRTheme.Fonts.body)
+            .padding(.vertical, isLarge ? 12 : 8)
+            .padding(.horizontal, isLarge ? 24 : 16)
+            .background(bgColor)
+            .foregroundColor(textColor)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(borderColor, lineWidth: 3)
+                    .offset(x: configuration.isPressed ? 0 : 0, y: configuration.isPressed ? 0 : 0)
+            )
+            .shadow(color: shadowColor, radius: 0, x: 0, y: configuration.isPressed ? 2 : 5)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(HRTheme.defaultAnimation, value: configuration.isPressed)
+    }
+}
+
+// Custom Card Style
+struct CPFMCardStyle: ViewModifier {
+    var bgColor: Color = HRTheme.white
+    var borderColor: Color = HRTheme.blueBorder
+    
+    func body(content: Content) -> some View {
+        content
+            .padding()
+            .background(bgColor)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(borderColor, lineWidth: 3)
+            )
+            .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+    }
+}
+
+extension View {
+    func cpfmCard(bgColor: Color = HRTheme.white, borderColor: Color = HRTheme.blueBorder) -> some View {
+        self.modifier(CPFMCardStyle(bgColor: bgColor, borderColor: borderColor))
+    }
+}
+
+// Animated Logo Text
+struct AnimatedText: View {
+    let text: String
+    let baseSize: CGFloat
+    @State private var animationTrigger = false
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { index, character in
+                Text(String(character))
+                    .font(.custom("ComicSansMS-Bold", size: baseSize))
+                    .foregroundColor(index % 2 == 0 ? HRTheme.red : HRTheme.blue)
+                    .scaleEffect(animationTrigger ? 1 + (0.2 * sin(Double(index) * 0.5)) : 1)
+                    .offset(y: animationTrigger ? -2 + (4 * sin(Double(index))) : 0)
+            }
+        }
+        .onAppear {
+            withAnimation(Animation.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                animationTrigger = true
+            }
+        }
+    }
+}
+
+// Emoji with Bounce
+struct BouncyEmoji: View {
+    let emoji: String
+    @State private var isAnimating = false
+    
+    var body: some View {
+        Text(emoji)
+            .font(.system(size: 28))
+            .scaleEffect(isAnimating ? 1.2 : 1.0)
+            .onAppear {
+                withAnimation(Animation.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                    isAnimating = true
+                }
+            }
+    }
+}
+
 // MARK: - Models
 struct Profile: Identifiable, Codable {
     var id: String
@@ -40,6 +204,12 @@ struct Game: Identifiable, Codable {
     var winner: String?
     var createdAt: Date?
     var userVote: String?
+    var sportType: SportType = .mlb
+    
+    enum SportType: String, Codable {
+        case mlb
+        case nba
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -51,6 +221,7 @@ struct Game: Identifiable, Codable {
         case status
         case winner
         case createdAt = "created_at"
+        case sportType = "sport_type"
     }
 }
 
@@ -287,16 +458,18 @@ class GamesViewModel: ObservableObject {
     @Published var games: [Game] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var selectedDate = Date()
+    @Published var selectedSport: Game.SportType = .mlb
     
     func fetchGames(userId: String) {
         self.isLoading = true
         self.errorMessage = nil
         
         // Check if we have a development environment flag to use mock data
-        if ProcessInfo.processInfo.environment["MOCK_MLB_DATA"] == "true" {
-            print("Using mock MLB data due to environment setting")
-            let mockGames = MLBService.shared.getMockMLBGames()
+        if ProcessInfo.processInfo.environment["MOCK_DATA"] == "true" {
+            print("Using mock data due to environment setting")
+            let mockGames = selectedSport == .mlb ? 
+                SportsService.shared.getMockMLBGames() : 
+                SportsService.shared.getMockNBAGames()
             
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
@@ -306,21 +479,40 @@ class GamesViewModel: ObservableObject {
             return
         }
         
-        // Use the new MLBService to fetch real data for the selected date
-        MLBService.shared.fetchMLBScheduleForDate(date: selectedDate) { [weak self] fetchedGames in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let games = fetchedGames, !games.isEmpty {
-                    print("Successfully fetched \(games.count) MLB games for the selected date")
-                    self.games = games
-                } else {
-                    // If the API fails, fall back to mock data
-                    print("Failed to fetch MLB data or no games scheduled, using mock data instead")
-                    self.games = MLBService.shared.getMockMLBGames()
-                    self.errorMessage = "Couldn't fetch games for the selected date. Using sample data."
+        // Use the SportsService to fetch real data for the selected sport
+        if selectedSport == .mlb {
+            SportsService.shared.fetchTodaysMLBSchedule { [weak self] fetchedGames in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let games = fetchedGames, !games.isEmpty {
+                        print("Successfully fetched \(games.count) MLB games")
+                        self.games = games
+                    } else {
+                        // If the API fails, fall back to mock data
+                        print("Failed to fetch MLB data, using mock data instead")
+                        self.games = SportsService.shared.getMockMLBGames()
+                        self.errorMessage = "Couldn't fetch today's games. Using sample data."
+                    }
+                    self.isLoading = false
                 }
-                self.isLoading = false
+            }
+        } else {
+            SportsService.shared.fetchTodaysNBASchedule { [weak self] fetchedGames in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let games = fetchedGames, !games.isEmpty {
+                        print("Successfully fetched \(games.count) NBA games")
+                        self.games = games
+                    } else {
+                        // If the API fails, fall back to mock data
+                        print("Failed to fetch NBA data, using mock data instead")
+                        self.games = SportsService.shared.getMockNBAGames()
+                        self.errorMessage = "Couldn't fetch today's games. Using sample data."
+                    }
+                    self.isLoading = false
+                }
             }
         }
     }
@@ -443,15 +635,36 @@ class RankingsViewModel: ObservableObject {
 
 // MARK: - Components
 struct LoadingView: View {
+    @State private var rotation: Double = 0
+    
     var body: some View {
         ZStack {
-            Color(.systemBackground)
-                .opacity(0.8)
+            Color.black.opacity(0.6)
                 .ignoresSafeArea()
             
-            ProgressView()
-                .scaleEffect(2)
-                .progressViewStyle(CircularProgressViewStyle(tint: Color(UIColor(red: 0.15, green: 0.39, blue: 0.92, alpha: 1.0))))
+            VStack(spacing: 20) {
+                Image(systemName: "baseball.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(HRTheme.gold)
+                    .rotationEffect(.degrees(rotation))
+                    .onAppear {
+                        withAnimation(Animation.linear(duration: 2).repeatForever(autoreverses: false)) {
+                            rotation = 360
+                        }
+                    }
+                
+                Text("LOADING...")
+                    .font(HRTheme.Fonts.subtitle)
+                    .foregroundColor(HRTheme.white)
+                    .tracking(5)
+            }
+            .padding(30)
+            .background(HRTheme.blue)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(HRTheme.gold, lineWidth: 3)
+            )
         }
     }
 }
@@ -460,6 +673,7 @@ struct AvatarView: View {
     var image: UIImage?
     var placeholder: String
     var size: CGFloat
+    @State private var hoverScale: CGFloat = 1.0
     
     var body: some View {
         if let image = image {
@@ -468,16 +682,38 @@ struct AvatarView: View {
                 .scaledToFill()
                 .frame(width: size, height: size)
                 .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(HRTheme.goldBorder, lineWidth: 3)
+                )
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .scaleEffect(hoverScale)
+                .onHover { hovering in
+                    withAnimation(HRTheme.springAnimation) {
+                        self.hoverScale = hovering ? 1.05 : 1.0
+                    }
+                }
         } else {
             ZStack {
                 Circle()
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(HRTheme.blue.opacity(0.2))
                 
                 Text(placeholder.prefix(2).uppercased())
-                    .font(.system(size: size * 0.4, weight: .bold))
-                    .foregroundColor(.gray)
+                    .font(.custom("ComicSansMS-Bold", size: size * 0.4))
+                    .foregroundColor(HRTheme.blue)
             }
             .frame(width: size, height: size)
+            .overlay(
+                Circle()
+                    .stroke(HRTheme.blueBorder, lineWidth: 3)
+            )
+            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+            .scaleEffect(hoverScale)
+            .onHover { hovering in
+                withAnimation(HRTheme.springAnimation) {
+                    self.hoverScale = hovering ? 1.05 : 1.0
+                }
+            }
         }
     }
 }
@@ -485,92 +721,97 @@ struct AvatarView: View {
 struct GameCardView: View {
     var game: Game
     var onVote: (Int, String) -> Void
+    @State private var cardOffset: CGFloat = 30
+    @State private var cardOpacity: Double = 0
+    @State private var isAnimating = false
     
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text(formatGameTime(game.startTime))
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(HRTheme.Fonts.caption)
+                    .foregroundColor(HRTheme.blue)
+                    .padding(8)
+                    .background(HRTheme.gold.opacity(0.3))
+                    .cornerRadius(8)
+                
                 Spacer()
+                
+                if game.status == "scheduled" {
+                    HStack(spacing: 6) {
+                        Image(systemName: game.sportType == .mlb ? "baseball.fill" : "basketball.fill")
+                            .foregroundColor(.white)
+                        
+                        Text("LIVE")
+                            .font(HRTheme.Fonts.caption)
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(HRTheme.red)
+                    .cornerRadius(8)
+                    .opacity(isAnimating ? 1 : 0.7)
+                    .scaleEffect(isAnimating ? 1.05 : 1)
+                    .onAppear {
+                        withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                            isAnimating = true
+                        }
+                    }
+                }
             }
             .padding(.horizontal)
             .padding(.top)
             
-            VStack(spacing: 16) {
+            VStack(spacing: 24) {
                 // Away team
-                HStack {
-                    HStack {
-                        ZStack {
-                            Circle()
-                                .fill(Color.gray.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                            
-                            Text(game.awayTeamAbbr ?? "")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Text(game.awayTeam)
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        onVote(game.id, "away")
-                    }) {
-                        Text(game.userVote == "away" ? "Picked" : "Pick")
-                            .frame(width: 80)
-                            .padding(.vertical, 8)
-                            .background(game.userVote == "away" ? Color.blue : Color.gray.opacity(0.1))
-                            .foregroundColor(game.userVote == "away" ? .white : .black)
-                            .cornerRadius(8)
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .disabled(game.status != "scheduled")
-                }
+                TeamRowView(
+                    teamAbbr: game.awayTeamAbbr ?? "",
+                    teamName: game.awayTeam,
+                    isSelected: game.userVote == "away",
+                    onPick: { onVote(game.id, "away") },
+                    isEnabled: game.status == "scheduled"
+                )
                 
-                Divider()
+                HStack {
+                    Rectangle()
+                        .fill(HRTheme.goldBorder)
+                        .frame(height: 3)
+                    Text("VS")
+                        .font(HRTheme.Fonts.title)
+                        .foregroundColor(HRTheme.blue)
+                        .padding(.horizontal, 8)
+                    Rectangle()
+                        .fill(HRTheme.goldBorder)
+                        .frame(height: 3)
+                }
+                .padding(.horizontal)
                 
                 // Home team
-                HStack {
-                    HStack {
-                        ZStack {
-                            Circle()
-                                .fill(Color.gray.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                            
-                            Text(game.homeTeamAbbr ?? "")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Text(game.homeTeam)
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        onVote(game.id, "home")
-                    }) {
-                        Text(game.userVote == "home" ? "Picked" : "Pick")
-                            .frame(width: 80)
-                            .padding(.vertical, 8)
-                            .background(game.userVote == "home" ? Color.blue : Color.gray.opacity(0.1))
-                            .foregroundColor(game.userVote == "home" ? .white : .black)
-                            .cornerRadius(8)
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .disabled(game.status != "scheduled")
-                }
+                TeamRowView(
+                    teamAbbr: game.homeTeamAbbr ?? "",
+                    teamName: game.homeTeam,
+                    isSelected: game.userVote == "home",
+                    onPick: { onVote(game.id, "home") },
+                    isEnabled: game.status == "scheduled"
+                )
             }
             .padding()
         }
         .background(Color.white)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(HRTheme.blueBorder, lineWidth: 3)
+        )
+        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
+        .offset(y: cardOffset)
+        .opacity(cardOpacity)
+        .onAppear {
+            withAnimation(Animation.spring(response: 0.6, dampingFraction: 0.7)) {
+                cardOffset = 0
+                cardOpacity = 1
+            }
+        }
     }
     
     private func formatGameTime(_ date: Date) -> String {
@@ -580,37 +821,101 @@ struct GameCardView: View {
     }
 }
 
+struct TeamRowView: View {
+    var teamAbbr: String
+    var teamName: String
+    var isSelected: Bool
+    var onPick: () -> Void
+    var isEnabled: Bool
+    @State private var isHovering = false
+    
+    var body: some View {
+        HStack {
+            HStack {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? HRTheme.gold : Color.gray.opacity(0.1))
+                        .frame(width: 50, height: 50)
+                    
+                    Text(teamAbbr)
+                        .font(.custom("ComicSansMS-Bold", size: 16))
+                        .foregroundColor(isSelected ? HRTheme.blue : Color.gray)
+                }
+                
+                Text(teamName)
+                    .font(HRTheme.Fonts.body)
+                    .fontWeight(.medium)
+            }
+            
+            Spacer()
+            
+            Button(action: onPick) {
+                Text(isSelected ? "PICKED" : "PICK")
+                    .font(.custom("ComicSansMS-Bold", size: 14))
+                    .tracking(2)
+                    .frame(width: 90)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(CPFMButtonStyle(
+                bgColor: isSelected ? HRTheme.blue : HRTheme.white,
+                borderColor: isSelected ? HRTheme.blueBorder : HRTheme.blueBorder,
+                shadowColor: isSelected ? HRTheme.blueShadow : HRTheme.whiteShadow,
+                textColor: isSelected ? .white : HRTheme.blue
+            ))
+            .disabled(!isEnabled)
+            .opacity(isEnabled ? 1 : 0.5)
+            .scaleEffect(isHovering && isEnabled ? 1.05 : 1)
+            .onHover { hovering in
+                withAnimation(HRTheme.springAnimation) {
+                    isHovering = hovering && isEnabled
+                }
+            }
+        }
+    }
+}
+
 struct FriendsListView: View {
     var friends: [Friend]
     
     var body: some View {
         if friends.isEmpty {
             Text("No friends added yet")
-                .foregroundColor(.gray)
+                .font(HRTheme.Fonts.body)
+                .foregroundColor(HRTheme.blue)
                 .padding()
+                .background(HRTheme.whiteBorder.opacity(0.5))
+                .cornerRadius(12)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(friends) { friend in
                         VStack(alignment: .center) {
                             AvatarView(
-                                image: nil, // You'd need to load these images
+                                image: nil,
                                 placeholder: friend.username ?? "User",
-                                size: 48
+                                size: 60
                             )
                             
-                            Text("\(Int(friend.hitRate))%")
-                                .font(.system(size: 12, weight: .bold))
+                            ZStack {
+                                Text("\(Int(friend.hitRate))%")
+                                    .font(.custom("ComicSansMS-Bold", size: 14))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(HRTheme.blue)
+                                    .cornerRadius(8)
+                            }
                             
                             Text(friend.username ?? "User")
-                                .font(.system(size: 12))
+                                .font(HRTheme.Fonts.caption)
+                                .foregroundColor(HRTheme.blue)
                                 .lineLimit(1)
-                                .frame(width: 64)
+                                .frame(width: 75)
                         }
-                        .frame(width: 64)
+                        .frame(width: 75)
+                        .padding(.vertical, 8)
                     }
                 }
-                .padding(.vertical, 8)
             }
         }
     }
@@ -619,45 +924,56 @@ struct FriendsListView: View {
 struct RankingRowView: View {
     var ranking: UserRanking
     var isCurrentUser: Bool
+    @State private var scaleAmount: CGFloat = 1.0
     
     var body: some View {
         HStack {
             Text("#\(ranking.rank)")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.gray)
-                .frame(width: 32)
+                .font(.custom("ComicSansMS-Bold", size: 18))
+                .foregroundColor(isCurrentUser ? HRTheme.gold : HRTheme.blue)
+                .frame(width: 40)
             
             AvatarView(
-                image: nil, // You'd need to load these images
+                image: nil,
                 placeholder: ranking.username,
-                size: 48
+                size: 50
             )
             .padding(.horizontal, 12)
             
             VStack(alignment: .leading) {
                 Text(ranking.username + (isCurrentUser ? " (You)" : ""))
-                    .font(.system(size: 16, weight: .medium))
+                    .font(HRTheme.Fonts.body)
+                    .foregroundColor(isCurrentUser ? HRTheme.gold : HRTheme.blue)
             }
             
             Spacer()
             
             VStack(alignment: .trailing) {
                 Text("\(Int(ranking.hitRate))%")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.custom("ComicSansMS-Bold", size: 20))
+                    .foregroundColor(isCurrentUser ? HRTheme.gold : HRTheme.blue)
                 
                 Text("↑ 3")
-                    .font(.system(size: 12))
+                    .font(HRTheme.Fonts.caption)
                     .foregroundColor(.green)
             }
         }
         .padding()
-        .background(isCurrentUser ? Color.blue.opacity(0.1) : Color.white)
-        .cornerRadius(12)
+        .background(isCurrentUser ? HRTheme.blue : Color.white)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isCurrentUser ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isCurrentUser ? HRTheme.gold : HRTheme.blueBorder, lineWidth: 3)
         )
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+        .scaleEffect(scaleAmount)
+        .onAppear {
+            if isCurrentUser {
+                withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    scaleAmount = 1.02
+                }
+            }
+        }
     }
 }
 
@@ -667,125 +983,236 @@ struct DashboardView: View {
     @StateObject private var profileViewModel = ProfileViewModel()
     @StateObject private var gamesViewModel = GamesViewModel()
     @StateObject private var friendsViewModel = FriendsViewModel()
-    @State private var showDatePicker = false
+    @State private var animateHeader = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor.systemGroupedBackground)
+                HRTheme.background
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Header included in NavigationView
+                    // Custom Header
+                    VStack {
+                        HStack {
+                            AnimatedText(text: "HIT RIVALS", baseSize: 28)
+                            
+                            Spacer()
+                            
+                            BouncyEmoji(emoji: "⚾")
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        
+                        Text("PLAY THE RIVALRY")
+                            .font(.custom("ComicSansMS-Bold", size: 16))
+                            .tracking(2)
+                            .padding(8)
+                            .frame(maxWidth: .infinity)
+                            .background(HRTheme.gold)
+                            .foregroundColor(HRTheme.blue)
+                            .offset(y: animateHeader ? 0 : -40)
+                            .opacity(animateHeader ? 1 : 0)
+                            .onAppear {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.6)) {
+                                    animateHeader = true
+                                }
+                            }
+                    }
                     
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 20) {
                             // User stats
                             HStack(spacing: 12) {
                                 AvatarView(
                                     image: profileViewModel.avatarImage,
                                     placeholder: profileViewModel.profile?.username ?? "User",
-                                    size: 48
+                                    size: 60
                                 )
                                 
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(profileViewModel.profile?.username ?? "User")
-                                        .font(.system(size: 16, weight: .medium))
+                                        .font(HRTheme.Fonts.subtitle)
                                     
-                                    HStack(spacing: 2) {
+                                    HStack(spacing: 4) {
                                         Text("\(Int(profileViewModel.hitRate))%")
-                                            .font(.system(size: 14, weight: .bold))
+                                            .font(.custom("ComicSansMS-Bold", size: 18))
+                                            .foregroundColor(HRTheme.red)
                                         
-                                        Text("Hit Rate")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(.gray)
+                                        Text("HIT RATE")
+                                            .font(.custom("ComicSansMS", size: 14))
+                                            .foregroundColor(HRTheme.blue)
                                     }
                                 }
-                            }
-                            .padding(.top)
-                            
-                            // Friends section
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("FRIENDS")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.gray)
-                                
-                                FriendsListView(friends: friendsViewModel.friends)
-                            }
-                            
-                            // Date selector
-                            HStack {
-                                Text(formatDate(gamesViewModel.selectedDate))
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.gray)
                                 
                                 Spacer()
                                 
-                                Button(action: {
-                                    showDatePicker.toggle()
-                                }) {
-                                    Image(systemName: "calendar")
-                                        .padding(8)
-                                        .background(Color.gray.opacity(0.1))
-                                        .clipShape(Circle())
-                                }
-                            }
-                            
-                            if showDatePicker {
-                                DatePicker(
-                                    "",
-                                    selection: $gamesViewModel.selectedDate,
-                                    displayedComponents: .date
-                                )
-                                .datePickerStyle(GraphicalDatePickerStyle())
-                                .onChange(of: gamesViewModel.selectedDate) { _, newDate in
-                                    showDatePicker = false
-                                    print("Date changed to: \(formatDate(newDate))")
+                                VStack {
+                                    Text("RANK")
+                                        .font(.custom("ComicSansMS", size: 12))
+                                        .foregroundColor(HRTheme.blue)
                                     
-                                    // Fetch games for the newly selected date
-                                    Task {
-                                        if let user = try? await SupabaseService.shared.getUser() {
-                                            gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                    Text("#\(profileViewModel.rank ?? 0)")
+                                        .font(.custom("ComicSansMS-Bold", size: 24))
+                                        .foregroundColor(HRTheme.gold)
+                                }
+                                .padding(12)
+                                .background(HRTheme.blue)
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
+                                )
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(HRTheme.blueBorder, lineWidth: 3)
+                            )
+                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            
+                            // Friends section
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("⭐ FRIENDS")
+                                    .font(.custom("ComicSansMS-Bold", size: 16))
+                                    .foregroundColor(HRTheme.blue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(HRTheme.gold)
+                                    .cornerRadius(8)
+                                
+                                FriendsListView(friends: friendsViewModel.friends)
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(HRTheme.blueBorder, lineWidth: 3)
+                            )
+                            .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            
+                            // Sport selector toggle
+                            VStack(spacing: 12) {
+                                Text("🏆 TODAY'S PICKS")
+                                    .font(.custom("ComicSansMS-Bold", size: 20))
+                                    .foregroundColor(HRTheme.blue)
+                                
+                                HStack(spacing: 0) {
+                                    Button(action: {
+                                        if gamesViewModel.selectedSport != .mlb {
+                                            gamesViewModel.selectedSport = .mlb
+                                            Task {
+                                                if let user = try? await SupabaseService.shared.getUser() {
+                                                    gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                                }
+                                            }
                                         }
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "baseball.fill")
+                                            Text("MLB")
+                                                .font(.custom("ComicSansMS-Bold", size: 16))
+                                        }
+                                        .padding(.vertical, 12)
+                                        .frame(maxWidth: .infinity)
+                                        .foregroundColor(gamesViewModel.selectedSport == .mlb ? .white : HRTheme.blue)
+                                        .background(gamesViewModel.selectedSport == .mlb ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                        .cornerRadius(12, corners: [.topLeft, .bottomLeft])
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(HRTheme.blueBorder, lineWidth: 3)
+                                                .cornerRadius(12, corners: [.topLeft, .bottomLeft])
+                                        )
+                                    }
+                                    
+                                    Button(action: {
+                                        if gamesViewModel.selectedSport != .nba {
+                                            gamesViewModel.selectedSport = .nba
+                                            Task {
+                                                if let user = try? await SupabaseService.shared.getUser() {
+                                                    gamesViewModel.fetchGames(userId: user.id.uuidString)
+                                                }
+                                            }
+                                        }
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "basketball.fill")
+                                            Text("NBA")
+                                                .font(.custom("ComicSansMS-Bold", size: 16))
+                                        }
+                                        .padding(.vertical, 12)
+                                        .frame(maxWidth: .infinity)
+                                        .foregroundColor(gamesViewModel.selectedSport == .nba ? .white : HRTheme.blue)
+                                        .background(gamesViewModel.selectedSport == .nba ? HRTheme.blue : HRTheme.gold.opacity(0.3))
+                                        .cornerRadius(12, corners: [.topRight, .bottomRight])
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(HRTheme.blueBorder, lineWidth: 3)
+                                                .cornerRadius(12, corners: [.topRight, .bottomRight])
+                                        )
                                     }
                                 }
                             }
+                            .padding(.horizontal)
                             
                             // Games list
                             if gamesViewModel.isLoading {
                                 HStack {
                                     Spacer()
                                     ProgressView()
+                                        .scaleEffect(2)
+                                        .padding(40)
                                     Spacer()
                                 }
-                                .padding(.top, 40)
                             } else if gamesViewModel.games.isEmpty {
                                 VStack {
-                                    Text("No games scheduled for this date.")
-                                        .foregroundColor(.gray)
+                                    Image(systemName: gamesViewModel.selectedSport == .mlb ? "baseball" : "basketball")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(HRTheme.blue)
+                                        .padding()
+                                    
+                                    Text("NO GAMES TODAY")
+                                        .font(.custom("ComicSansMS-Bold", size: 18))
+                                        .foregroundColor(HRTheme.blue)
+                                    
+                                    Text("Check back later!")
+                                        .font(HRTheme.Fonts.body)
+                                        .foregroundColor(HRTheme.blue.opacity(0.8))
+                                        .multilineTextAlignment(.center)
+                                        .padding()
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 120)
+                                .padding(30)
                                 .background(Color.white)
-                                .cornerRadius(12)
-                                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                                .cornerRadius(20)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(HRTheme.blueBorder, lineWidth: 3)
+                                )
+                                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                                .padding(.horizontal)
                             } else {
-                                ForEach(gamesViewModel.games) { game in
-                                    GameCardView(game: game) { gameId, teamChoice in
-                                        Task {
-                                            if let user = try? await SupabaseService.shared.getUser() {
-                                                gamesViewModel.vote(
-                                                    userId: user.id.uuidString,
-                                                    gameId: gameId,
-                                                    teamChoice: teamChoice
-                                                )
+                                VStack(spacing: 20) {
+                                    ForEach(gamesViewModel.games) { game in
+                                        GameCardView(game: game) { gameId, teamChoice in
+                                            Task {
+                                                if let user = try? await SupabaseService.shared.getUser() {
+                                                    gamesViewModel.vote(
+                                                        userId: user.id.uuidString,
+                                                        gameId: gameId,
+                                                        teamChoice: teamChoice
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
+                                .padding(.horizontal)
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 20) // Extra space at the bottom
+                        .padding(.bottom, 30)
                     }
                 }
                 
@@ -793,8 +1220,7 @@ struct DashboardView: View {
                     LoadingView()
                 }
             }
-            .navigationTitle("⚾ Today's Games")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
         }
         .onAppear {
             Task {
@@ -805,12 +1231,6 @@ struct DashboardView: View {
                 }
             }
         }
-    }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d, yyyy"
-        return formatter.string(from: date).uppercased()
     }
 }
 
@@ -1479,43 +1899,119 @@ struct ImagePicker: UIViewControllerRepresentable {
 struct ContentView: View {
     @StateObject private var appModel = AppModel.shared
     @State private var selectedTab = 0
+    @State private var tabBarOffset: CGFloat = 100
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DashboardView()
-                .environmentObject(appModel)
-                .tag(0)
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Home")
+        ZStack(alignment: .bottom) {
+            TabView(selection: $selectedTab) {
+                DashboardView()
+                    .environmentObject(appModel)
+                    .tag(0)
+                
+                RankingsView()
+                    .tag(1)
+                
+                FriendsView()
+                    .tag(2)
+                
+                ProfileView()
+                    .tag(3)
+            }
+            .accentColor(HRTheme.blue)
+            .onAppear {
+                // Set font registration
+                UINavigationBar.appearance().largeTitleTextAttributes = [.foregroundColor: UIColor(HRTheme.blue)]
+                UINavigationBar.appearance().titleTextAttributes = [.foregroundColor: UIColor(HRTheme.blue)]
+                
+                // Remove TabBar default styling
+                UITabBar.appearance().backgroundImage = UIImage()
+                UITabBar.appearance().shadowImage = UIImage()
+                UITabBar.appearance().backgroundColor = .clear
+                UITabBar.appearance().barTintColor = .clear
+                
+                // Animate tab bar
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    tabBarOffset = 0
                 }
+            }
             
-            RankingsView()
-                .tag(1)
-                .tabItem {
-                    Image(systemName: "chart.bar.fill")
-                    Text("Rankings")
+            // Custom TabBar
+            HStack(spacing: 0) {
+                ForEach(0..<4, id: \.self) { index in
+                    Button(action: {
+                        selectedTab = index
+                    }) {
+                        VStack(spacing: 6) {
+                            Image(systemName: tabIcon(for: index))
+                                .font(.system(size: 24))
+                            
+                            Text(tabTitle(for: index))
+                                .font(.custom("ComicSansMS", size: 12))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundColor(selectedTab == index ? HRTheme.gold : .white)
+                        .background(
+                            selectedTab == index ?
+                            HRTheme.blue.opacity(0.8) :
+                            HRTheme.blue
+                        )
+                        .contentShape(Rectangle())
+                    }
                 }
-            
-            FriendsView()
-                .tag(2)
-                .tabItem {
-                    Image(systemName: "person.2.fill")
-                    Text("Friends")
-                }
-            
-            ProfileView()
-                .tag(3)
-                .tabItem {
-                    Image(systemName: "person.fill")
-                    Text("Profile")
-                }
+            }
+            .background(HRTheme.blue)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(HRTheme.gold, lineWidth: 3)
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: -5)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 10)
+            .offset(y: tabBarOffset)
         }
-        .accentColor(.blue)
+    }
+    
+    private func tabIcon(for index: Int) -> String {
+        switch index {
+        case 0: return "house.fill"
+        case 1: return "trophy.fill"
+        case 2: return "person.2.fill"
+        case 3: return "person.crop.circle.fill"
+        default: return "questionmark"
+        }
+    }
+    
+    private func tabTitle(for index: Int) -> String {
+        switch index {
+        case 0: return "HOME"
+        case 1: return "RANKS"
+        case 2: return "FRIENDS"
+        case 3: return "PROFILE"
+        default: return ""
+        }
     }
 }
 
 // MARK: - SwiftUI Preview
 #Preview {
     ContentView()
+}
+
+// Add extension for custom corner radius
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
+    }
 }
