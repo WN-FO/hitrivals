@@ -4,9 +4,30 @@ import Foundation
 class SportsService {
     static let shared = SportsService()
     
+    // Use the same SportType enum as defined in the Game model
     enum SportType {
         case mlb
         case nba
+        
+        // Convert to Game.SportType
+        func toGameSportType() -> Game.SportType {
+            switch self {
+            case .mlb:
+                return .mlb
+            case .nba:
+                return .nba
+            }
+        }
+        
+        // Create from Game.SportType
+        static func from(gameSportType: Game.SportType) -> SportType {
+            switch gameSportType {
+            case .mlb:
+                return .mlb
+            case .nba:
+                return .nba
+            }
+        }
     }
     
     private let mlbBaseURL = "https://tank01-mlb-live-in-game-real-time-statistics.p.rapidapi.com"
@@ -23,6 +44,278 @@ class SportsService {
     /// Fetch today's NBA schedule
     func fetchTodaysNBASchedule(completion: @escaping ([Game]?) -> Void) {
         fetchNBASchedule(date: Date(), attempts: 3, completion: completion)
+    }
+    
+    /// Fetch live score for an MLB game
+    func fetchMLBLiveScore(gameID: String, completion: @escaping (Game?) -> Void) {
+        let endpoint = "/getMLBLineScore?gameID=\(gameID)"
+        
+        print("Fetching MLB live score for game: \(gameID)")
+        
+        // Construct the URL
+        guard let url = URL(string: mlbBaseURL + endpoint) else {
+            print("Error: invalid URL")
+            completion(nil)
+            return
+        }
+        
+        // Create the request with headers
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue(apiKey, forHTTPHeaderField: "x-rapidapi-key")
+        request.addValue("tank01-mlb-live-in-game-real-time-statistics.p.rapidapi.com", forHTTPHeaderField: "x-rapidapi-host")
+        
+        // Create the data task
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            // Handle errors
+            if let error = error {
+                print("Error fetching MLB live score: \(error)")
+                completion(nil)
+                return
+            }
+            
+            // Ensure we have data
+            guard let data = data else {
+                print("No data returned from MLB live score API")
+                completion(nil)
+                return
+            }
+            
+            do {
+                // Parse the JSON response
+                let decoder = JSONDecoder()
+                let apiResponse = try decoder.decode(MLBLiveScoreResponse.self, from: data)
+                
+                // Extract game info
+                let gameStatus = apiResponse.body.gameStatus
+                let currentInning = apiResponse.body.currentInning
+                let homeTeamAbbr = apiResponse.body.home
+                let awayTeamAbbr = apiResponse.body.away
+                
+                // Extract scores
+                let homeScore = Int(apiResponse.body.lineScore.home.R) ?? 0
+                let awayScore = Int(apiResponse.body.lineScore.away.R) ?? 0
+                
+                // Extract scores by inning
+                let homeScoresByInning = apiResponse.body.lineScore.home.scoresByInning
+                let awayScoresByInning = apiResponse.body.lineScore.away.scoresByInning
+                
+                // Get the standard game components
+                var components = gameID.split(separator: "_")
+                if components.count >= 2 {
+                    let dateComponent = components[0]
+                    let teamsComponent = components[1]
+                    
+                    // Create a unique integer id from the string id
+                    let teamsHash = abs(teamsComponent.hashValue % 10000)
+                    let gameIdInt: Int
+                    if let dateInt = Int(dateComponent.suffix(4)) {
+                        gameIdInt = (dateInt * 10000) + teamsHash
+                    } else {
+                        gameIdInt = teamsHash + Int.random(in: 1000...9999)
+                    }
+                    
+                    // Create a game object with the score information
+                    let game = Game(
+                        id: gameIdInt,
+                        homeTeam: self.getMLBFullTeamName(homeTeamAbbr),
+                        awayTeam: self.getMLBFullTeamName(awayTeamAbbr),
+                        homeTeamAbbr: homeTeamAbbr,
+                        awayTeamAbbr: awayTeamAbbr,
+                        startTime: Date(),  // We don't know the exact start time here
+                        status: gameStatus.lowercased(),
+                        sportType: .mlb,
+                        homeScore: homeScore,
+                        awayScore: awayScore,
+                        currentInningOrQuarter: currentInning,
+                        homeScoreByPeriod: homeScoresByInning,
+                        awayScoreByPeriod: awayScoresByInning
+                    )
+                    
+                    completion(game)
+                } else {
+                    completion(nil)
+                }
+            } catch {
+                print("Error parsing MLB live score data: \(error)")
+                completion(nil)
+            }
+        }
+        
+        // Start the network request
+        task.resume()
+    }
+    
+    /// Fetch live score for an NBA game
+    func fetchNBALiveScore(gameID: String, completion: @escaping (Game?) -> Void) {
+        let endpoint = "/getNBABoxScore?gameID=\(gameID)&fantasyPoints=true&pts=1&stl=3&blk=3&reb=1.25&ast=1.5&TOV=-1&mins=0&doubleDouble=0&tripleDouble=0&quadDouble=0"
+        
+        print("Fetching NBA live score for game: \(gameID)")
+        
+        // Construct the URL
+        guard let url = URL(string: nbaBaseURL + endpoint) else {
+            print("Error: invalid URL")
+            completion(nil)
+            return
+        }
+        
+        // Create the request with headers
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue(apiKey, forHTTPHeaderField: "x-rapidapi-key")
+        request.addValue("tank01-fantasy-stats.p.rapidapi.com", forHTTPHeaderField: "x-rapidapi-host")
+        
+        // Create the data task
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            // Handle errors
+            if let error = error {
+                print("Error fetching NBA live score: \(error)")
+                completion(nil)
+                return
+            }
+            
+            // Ensure we have data
+            guard let data = data else {
+                print("No data returned from NBA live score API")
+                completion(nil)
+                return
+            }
+            
+            do {
+                // Parse the JSON response
+                let decoder = JSONDecoder()
+                let apiResponse = try decoder.decode(NBABoxScoreResponse.self, from: data)
+                
+                // Extract game info
+                let gameStatus = apiResponse.body.gameStatus
+                let currentPeriod = apiResponse.body.gameClock
+                let homeTeamAbbr = apiResponse.body.home
+                let awayTeamAbbr = apiResponse.body.away
+                
+                // Extract scores
+                let homeScore = Int(apiResponse.body.homePts) ?? 0
+                let awayScore = Int(apiResponse.body.awayPts) ?? 0
+                
+                // Extract scores by quarter
+                var homeScoresByPeriod: [String: String] = [:]
+                var awayScoresByPeriod: [String: String] = [:]
+                
+                if let homeLine = apiResponse.body.lineScore.CLE,
+                   let awayLine = apiResponse.body.lineScore.SA {
+                    homeScoresByPeriod = [
+                        "1": homeLine.Q1 ?? "0",
+                        "2": homeLine.Q2 ?? "0",
+                        "3": homeLine.Q3 ?? "0",
+                        "4": homeLine.Q4 ?? "0"
+                    ]
+                    
+                    awayScoresByPeriod = [
+                        "1": awayLine.Q1 ?? "0",
+                        "2": awayLine.Q2 ?? "0",
+                        "3": awayLine.Q3 ?? "0",
+                        "4": awayLine.Q4 ?? "0"
+                    ]
+                }
+                
+                // Get the standard game components
+                var components = gameID.split(separator: "_")
+                if components.count >= 2 {
+                    let dateComponent = components[0]
+                    let teamsComponent = components[1]
+                    
+                    // Create a unique integer id from the string id
+                    let teamsHash = abs(teamsComponent.hashValue % 10000)
+                    let gameIdInt: Int
+                    if let dateInt = Int(dateComponent.suffix(4)) {
+                        gameIdInt = (dateInt * 10000) + teamsHash + 5000000 // Add offset to avoid MLB ID collisions
+                    } else {
+                        gameIdInt = teamsHash + 5000000 + Int.random(in: 1000...9999)
+                    }
+                    
+                    // Create a game object with the score information
+                    let game = Game(
+                        id: gameIdInt,
+                        homeTeam: self.getNBAFullTeamName(homeTeamAbbr),
+                        awayTeam: self.getNBAFullTeamName(awayTeamAbbr),
+                        homeTeamAbbr: homeTeamAbbr,
+                        awayTeamAbbr: awayTeamAbbr,
+                        startTime: Date(),  // We don't know the exact start time here
+                        status: gameStatus.lowercased(),
+                        sportType: .nba,
+                        homeScore: homeScore,
+                        awayScore: awayScore,
+                        currentInningOrQuarter: currentPeriod,
+                        homeScoreByPeriod: homeScoresByPeriod,
+                        awayScoreByPeriod: awayScoresByPeriod
+                    )
+                    
+                    completion(game)
+                } else {
+                    completion(nil)
+                }
+            } catch {
+                print("Error parsing NBA live score data: \(error)")
+                completion(nil)
+            }
+        }
+        
+        // Start the network request
+        task.resume()
+    }
+    
+    /// Update live scores for a list of games
+    func updateLiveScores(games: [Game], completion: @escaping ([Game]) -> Void) {
+        let dispatchGroup = DispatchGroup()
+        var updatedGames = games
+        
+        for (index, game) in games.enumerated() {
+            // Only fetch updates for scheduled or live games
+            if game.status == "scheduled" || game.status == "live" {
+                // Create the game ID in the format expected by the API
+                if let homeAbbr = game.homeTeamAbbr, let awayAbbr = game.awayTeamAbbr {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "yyyyMMdd"
+                    let dateString = dateFormatter.string(from: game.startTime)
+                    
+                    let gameID = "\(dateString)_\(awayAbbr)@\(homeAbbr)"
+                    
+                    dispatchGroup.enter()
+                    
+                    // Convert Game.SportType to SportsService.SportType
+                    let sportType = SportType.from(gameSportType: game.sportType)
+                    
+                    if sportType == .mlb {
+                        fetchMLBLiveScore(gameID: gameID) { updatedGame in
+                            if let updatedGame = updatedGame {
+                                // Preserve the original start time
+                                var game = updatedGame
+                                game.startTime = games[index].startTime
+                                DispatchQueue.main.async {
+                                    updatedGames[index] = game
+                                }
+                            }
+                            dispatchGroup.leave()
+                        }
+                    } else {
+                        fetchNBALiveScore(gameID: gameID) { updatedGame in
+                            if let updatedGame = updatedGame {
+                                // Preserve the original start time
+                                var game = updatedGame
+                                game.startTime = games[index].startTime
+                                DispatchQueue.main.async {
+                                    updatedGames[index] = game
+                                }
+                            }
+                            dispatchGroup.leave()
+                        }
+                    }
+                }
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(updatedGames)
+        }
     }
     
     // MARK: - MLB API Methods
@@ -636,4 +929,133 @@ struct NBAApiGame: Codable {
     let gameDate: String
     let teamIDHome: String
     let home: String
+}
+
+// MARK: - API Response Models for Live Scores
+
+struct MLBLiveScoreResponse: Codable {
+    let statusCode: Int
+    let body: MLBLiveScoreBody
+}
+
+struct MLBLiveScoreBody: Codable {
+    let decisions: [MLBDecision]?
+    let gameStatus: String
+    let lastUpdated: Int?
+    let currentBatter: String?
+    let gameDate: String
+    let awayResult: String?
+    let currentCount: String?
+    let homeResult: String?
+    let away: String
+    let lineScore: MLBLineScore
+    let onDeck: String?
+    let currentOuts: String?
+    let currentPitcher: String?
+    let currentInning: String
+    let gameID: String
+    let home: String
+    let gameStatusCode: String?
+}
+
+struct MLBDecision: Codable {
+    let decision: String
+    let playerID: String
+    let team: String
+}
+
+struct MLBLineScore: Codable {
+    let away: MLBTeamScore
+    let home: MLBTeamScore
+}
+
+struct MLBTeamScore: Codable {
+    let H: String
+    let R: String
+    let team: String
+    let scoresByInning: [String: String]
+    let E: String
+}
+
+struct NBABoxScoreResponse: Codable {
+    let statusCode: Int
+    let body: NBABoxScoreBody
+}
+
+struct NBABoxScoreBody: Codable {
+    let gameStatus: String
+    let arenaCapacity: String?
+    let referees: String?
+    let arena: String?
+    let teamStats: [String: NBATeamStats]?
+    let gameDate: String
+    let homePts: String
+    let teamIDHome: String?
+    let awayResult: String?
+    let homeResult: String?
+    let teamIDAway: String?
+    let away: String
+    let attendance: String?
+    let lineScore: NBALineScore
+    let gameLocation: String?
+    let gameClock: String
+    let awayPts: String
+    let gameID: String
+    let home: String
+}
+
+struct NBATeamStats: Codable {
+    let pts: String?
+    let ast: String?
+    let reb: String?
+    let blk: String?
+    let stl: String?
+    let TOV: String?
+    // Add other stats as needed
+}
+
+struct NBALineScore: Codable {
+    let CLE: NBAQuarterScore?
+    let SA: NBAQuarterScore?
+    // Dynamic keys for teams
+    
+    private struct DynamicCodingKeys: CodingKey {
+        var stringValue: String
+        var intValue: Int?
+        
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+            self.intValue = nil
+        }
+        
+        init?(intValue: Int) {
+            return nil
+        }
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        
+        // Attempt to decode home team
+        if let homeKey = DynamicCodingKeys(stringValue: "CLE") {
+            self.CLE = try container.decodeIfPresent(NBAQuarterScore.self, forKey: homeKey)
+        } else {
+            self.CLE = nil
+        }
+        
+        // Attempt to decode away team
+        if let awayKey = DynamicCodingKeys(stringValue: "SA") {
+            self.SA = try container.decodeIfPresent(NBAQuarterScore.self, forKey: awayKey)
+        } else {
+            self.SA = nil
+        }
+    }
+}
+
+struct NBAQuarterScore: Codable {
+    let Q1: String?
+    let Q2: String?
+    let Q3: String?
+    let Q4: String?
+    let totalPts: String?
 } 

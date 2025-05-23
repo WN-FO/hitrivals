@@ -123,7 +123,7 @@ struct CPFMCardStyle: ViewModifier {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(borderColor, lineWidth: 3)
             )
-            .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+            .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
     }
 }
 
@@ -206,6 +206,29 @@ struct Game: Identifiable, Codable {
     var userVote: String?
     var sportType: SportType = .mlb
     
+    // Score information
+    var homeScore: Int?
+    var awayScore: Int?
+    var currentInningOrQuarter: String?
+    var homeScoreByPeriod: [String: String]?
+    var awayScoreByPeriod: [String: String]?
+    var isLive: Bool {
+        return status == "live"
+    }
+    var isOver: Bool {
+        return status == "completed" || status == "Completed"
+    }
+    var isUpcoming: Bool {
+        return status == "scheduled" || status == "Scheduled"
+    }
+    var isVotingAllowed: Bool {
+        if !isUpcoming {
+            return false
+        }
+        // Cut off voting 5 minutes before game starts
+        return startTime.timeIntervalSinceNow > 5 * 60
+    }
+    
     enum SportType: String, Codable {
         case mlb
         case nba
@@ -222,6 +245,11 @@ struct Game: Identifiable, Codable {
         case winner
         case createdAt = "created_at"
         case sportType = "sport_type"
+        case homeScore = "home_score"
+        case awayScore = "away_score"
+        case currentInningOrQuarter = "current_period"
+        case homeScoreByPeriod = "home_score_by_period"
+        case awayScoreByPeriod = "away_score_by_period"
     }
 }
 
@@ -462,6 +490,39 @@ class GamesViewModel: ObservableObject {
     @Published var showVoteConfirmation = false
     @Published var confirmationTeam: String?
     
+    private var scoreRefreshTimer: Timer?
+    private let refreshInterval: TimeInterval = 60 // Refresh scores every 60 seconds
+    
+    init() {
+        // Set up the timer for score updates
+        setupScoreRefreshTimer()
+    }
+    
+    deinit {
+        // Clean up timer when view model is deallocated
+        scoreRefreshTimer?.invalidate()
+    }
+    
+    private func setupScoreRefreshTimer() {
+        scoreRefreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.refreshScores()
+        }
+    }
+    
+    func refreshScores() {
+        // Only refresh if we have games
+        guard !games.isEmpty else { return }
+        
+        SportsService.shared.updateLiveScores(games: games) { [weak self] updatedGames in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                self.games = updatedGames
+            }
+        }
+    }
+
     func fetchGames(userId: String) {
         self.isLoading = true
         self.errorMessage = nil
@@ -477,6 +538,9 @@ class GamesViewModel: ObservableObject {
                 guard let self = self else { return }
                 self.games = mockGames
                 self.isLoading = false
+                
+                // Refresh scores immediately to get current status
+                self.refreshScores()
             }
             return
         }
@@ -490,11 +554,17 @@ class GamesViewModel: ObservableObject {
                     if let games = fetchedGames, !games.isEmpty {
                         print("Successfully fetched \(games.count) MLB games")
                         self.games = games
+                        
+                        // Refresh scores immediately to get current status
+                        self.refreshScores()
                     } else {
                         // If the API fails, fall back to mock data
                         print("Failed to fetch MLB data, using mock data instead")
                         self.games = SportsService.shared.getMockMLBGames()
                         self.errorMessage = "Couldn't fetch today's games. Using sample data."
+                        
+                        // Refresh scores for mock data too
+                        self.refreshScores()
                     }
                     self.isLoading = false
                 }
@@ -507,11 +577,17 @@ class GamesViewModel: ObservableObject {
                     if let games = fetchedGames, !games.isEmpty {
                         print("Successfully fetched \(games.count) NBA games")
                         self.games = games
+                        
+                        // Refresh scores immediately to get current status
+                        self.refreshScores()
                     } else {
                         // If the API fails, fall back to mock data
                         print("Failed to fetch NBA data, using mock data instead")
                         self.games = SportsService.shared.getMockNBAGames()
                         self.errorMessage = "Couldn't fetch today's games. Using sample data."
+                        
+                        // Refresh scores for mock data too
+                        self.refreshScores()
                     }
                     self.isLoading = false
                 }
@@ -520,6 +596,13 @@ class GamesViewModel: ObservableObject {
     }
     
     func vote(userId: String, gameId: Int, teamChoice: String) {
+        // Only allow voting if the game is upcoming and more than 5 minutes before start
+        guard let game = games.first(where: { $0.id == gameId }),
+              game.isVotingAllowed else {
+            // Show error or notification that voting is no longer allowed
+            return
+        }
+        
         // Enhanced haptic feedback pattern
         let lightGenerator = UIImpactFeedbackGenerator(style: .light)
         let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
@@ -760,6 +843,7 @@ struct GameCardView: View {
     @State private var cardOffset: CGFloat = 50
     @State private var cardOpacity: Double = 0
     @State private var isAnimating = false
+    @State private var showGameDetail = false
     
     // Get border color based on user's vote
     var cardBorderColor: Color {
@@ -797,7 +881,7 @@ struct GameCardView: View {
                 Spacer()
                 
                 // Game status indicator
-                if game.status == "live" {
+                if game.isLive {
                     HStack(spacing: 8) {
                         Circle()
                             .fill(Color.red)
@@ -819,6 +903,22 @@ struct GameCardView: View {
                             isAnimating = true
                         }
                     }
+                } else if game.isOver {
+                    Text("FINAL")
+                        .font(HRTheme.Fonts.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(HRTheme.blue)
+                        .cornerRadius(8)
+                } else if !game.isVotingAllowed {
+                    Text("STARTING SOON")
+                        .font(HRTheme.Fonts.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(HRTheme.gold)
+                        .cornerRadius(8)
                 }
             }
             .padding(.horizontal)
@@ -829,19 +929,30 @@ struct GameCardView: View {
                 TeamRowView(
                     teamAbbr: game.awayTeamAbbr ?? "",
                     teamName: game.awayTeam,
+                    score: game.awayScore,
                     isSelected: game.userVote == "away",
                     onPick: { onVote(game.id, "away") },
-                    isEnabled: game.status == "scheduled"
+                    isEnabled: game.isVotingAllowed
                 )
                 
                 HStack {
                     Rectangle()
                         .fill(HRTheme.goldBorder)
                         .frame(height: 3)
-                    Text("VS")
-                        .font(HRTheme.Fonts.title)
-                        .foregroundColor(HRTheme.blue)
-                        .padding(.horizontal, 8)
+                    
+                    // Display current inning/quarter in the middle
+                    if let period = game.currentInningOrQuarter, game.isLive || game.isOver {
+                        Text(formatGamePeriod(period, sportType: game.sportType))
+                            .font(HRTheme.Fonts.body)
+                            .foregroundColor(HRTheme.blue)
+                            .padding(.horizontal, 8)
+                    } else {
+                        Text("VS")
+                            .font(HRTheme.Fonts.title)
+                            .foregroundColor(HRTheme.blue)
+                            .padding(.horizontal, 8)
+                    }
+                    
                     Rectangle()
                         .fill(HRTheme.goldBorder)
                         .frame(height: 3)
@@ -852,9 +963,10 @@ struct GameCardView: View {
                 TeamRowView(
                     teamAbbr: game.homeTeamAbbr ?? "",
                     teamName: game.homeTeam,
+                    score: game.homeScore,
                     isSelected: game.userVote == "home",
                     onPick: { onVote(game.id, "home") },
-                    isEnabled: game.status == "scheduled"
+                    isEnabled: game.isVotingAllowed
                 )
             }
             .padding()
@@ -868,6 +980,9 @@ struct GameCardView: View {
         .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
         .offset(y: cardOffset)
         .opacity(cardOpacity)
+        .sheet(isPresented: $showGameDetail) {
+            GameDetailView(game: game)
+        }
         .onAppear {
             // Debug team names to ensure they match with logo files
             print("Game teams - Home: \(game.homeTeam), Away: \(game.awayTeam)")
@@ -886,6 +1001,26 @@ struct GameCardView: View {
                 cardOpacity = 1
             }
         }
+        
+        // "View Details" button if game is live or over
+        if game.isLive || game.isOver {
+            Button(action: {
+                showGameDetail = true
+            }) {
+                HStack {
+                    Spacer()
+                    Text("VIEW DETAILS")
+                        .font(HRTheme.Fonts.caption)
+                        .foregroundColor(HRTheme.white)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .background(HRTheme.blue)
+                .cornerRadius(10)
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            }
+        }
     }
     
     // Format the game time for display
@@ -899,6 +1034,7 @@ struct GameCardView: View {
 struct TeamRowView: View {
     var teamAbbr: String
     var teamName: String
+    var score: Int?
     var isSelected: Bool
     var onPick: () -> Void
     var isEnabled: Bool
@@ -1010,6 +1146,15 @@ struct TeamRowView: View {
             }
             
             Spacer()
+            
+            // Display score if available
+            if let score = score {
+                Text("\(score)")
+                    .font(.custom("ComicSansMS-Bold", size: 24))
+                    .foregroundColor(HRTheme.blue)
+                    .frame(minWidth: 40)
+                    .padding(.horizontal, 8)
+            }
             
             if isEnabled {
                 Button(action: {
@@ -2747,6 +2892,621 @@ struct VoteConfirmationView: View {
             }
         }
         return .mlb
+    }
+}
+
+// Format game period for display
+private func formatGamePeriod(_ period: String, sportType: Game.SportType) -> String {
+    if sportType == .mlb {
+        if period.lowercased() == "final" {
+            return "FINAL"
+        } else {
+            return period.uppercased()
+        }
+    } else { // NBA
+        if period.lowercased() == "final" {
+            return "FINAL"
+        } else if period.contains("Q") {
+            return period.uppercased()
+        } else {
+            return period.uppercased()
+        }
+    }
+}
+
+// Game Detail View
+struct GameDetailView: View {
+    var game: Game
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header with teams and score
+                VStack(spacing: 16) {
+                    // Close button
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(HRTheme.blue)
+                        }
+                        .padding(.top, 8)
+                        .padding(.trailing, 16)
+                    }
+                    
+                    // Game header with teams and logos
+                    HStack(spacing: 20) {
+                        // Away team
+                        VStack(spacing: 10) {
+                            if let logoImage = TeamLogoManager.shared.logoImage(for: game.awayTeamAbbr ?? "", sportType: game.sportType == .nba ? .nba : .mlb) {
+                                logoImage
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 80, height: 80)
+                            } else {
+                                Text(game.awayTeamAbbr ?? "")
+                                    .font(.custom("ComicSansMS-Bold", size: 28))
+                                    .foregroundColor(HRTheme.blue)
+                            }
+                            
+                            Text(game.awayTeam)
+                                .font(HRTheme.Fonts.body)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 120)
+                            
+                            if let score = game.awayScore, game.isLive || game.isOver {
+                                Text("\(score)")
+                                    .font(.custom("ComicSansMS-Bold", size: 36))
+                                    .foregroundColor(HRTheme.blue)
+                            }
+                        }
+                        
+                        // VS or current period
+                        VStack {
+                            if game.isLive || game.isOver, let period = game.currentInningOrQuarter {
+                                Text(formatGamePeriod(period))
+                                    .font(HRTheme.Fonts.subtitle)
+                                    .foregroundColor(game.isLive ? HRTheme.red : HRTheme.blue)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(game.isLive ? HRTheme.red.opacity(0.1) : HRTheme.blue.opacity(0.1))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(game.isLive ? HRTheme.red : HRTheme.blue, lineWidth: 2)
+                                            )
+                                    )
+                            } else {
+                                Text("VS")
+                                    .font(HRTheme.Fonts.title)
+                                    .foregroundColor(HRTheme.blue)
+                            }
+                            
+                            // Game status
+                            if game.isLive {
+                                Text("LIVE")
+                                    .font(HRTheme.Fonts.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(HRTheme.red)
+                                    .cornerRadius(10)
+                            } else if game.isOver {
+                                Text("FINAL")
+                                    .font(HRTheme.Fonts.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(HRTheme.blue)
+                                    .cornerRadius(10)
+                            } else if !game.isVotingAllowed {
+                                Text("STARTING SOON")
+                                    .font(HRTheme.Fonts.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(HRTheme.gold)
+                                    .cornerRadius(10)
+                            } else {
+                                Text("UPCOMING")
+                                    .font(HRTheme.Fonts.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(HRTheme.blue)
+                                    .cornerRadius(10)
+                            }
+                            
+                            // Game time
+                            Text(formatGameTime(game.startTime))
+                                .font(HRTheme.Fonts.caption)
+                                .foregroundColor(HRTheme.blue)
+                        }
+                        
+                        // Home team
+                        VStack(spacing: 10) {
+                            if let logoImage = TeamLogoManager.shared.logoImage(for: game.homeTeamAbbr ?? "", sportType: game.sportType == .nba ? .nba : .mlb) {
+                                logoImage
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 80, height: 80)
+                            } else {
+                                Text(game.homeTeamAbbr ?? "")
+                                    .font(.custom("ComicSansMS-Bold", size: 28))
+                                    .foregroundColor(HRTheme.blue)
+                            }
+                            
+                            Text(game.homeTeam)
+                                .font(HRTheme.Fonts.body)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 120)
+                            
+                            if let score = game.homeScore, game.isLive || game.isOver {
+                                Text("\(score)")
+                                    .font(.custom("ComicSansMS-Bold", size: 36))
+                                    .foregroundColor(HRTheme.blue)
+                            }
+                        }
+                    }
+                    .padding(.top, 10)
+                    .padding(.bottom, 20)
+                }
+                .background(Color.white)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(game.isLive ? HRTheme.redBorder : HRTheme.blueBorder, lineWidth: 3)
+                )
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                
+                // Detailed scoring
+                if (game.isLive || game.isOver) && (game.homeScoreByPeriod != nil || game.awayScoreByPeriod != nil) {
+                    VStack(spacing: 16) {
+                        Text("SCORING BY \(game.sportType == .mlb ? "INNING" : "QUARTER")")
+                            .font(HRTheme.Fonts.subtitle)
+                            .foregroundColor(HRTheme.blue)
+                            .padding(.top, 12)
+                        
+                        // Score table (depends on sport type)
+                        if game.sportType == .mlb {
+                            // MLB Scoring Table
+                            MLBScoringTable(
+                                homeTeam: game.homeTeamAbbr ?? "HOME",
+                                awayTeam: game.awayTeamAbbr ?? "AWAY",
+                                homeScores: game.homeScoreByPeriod ?? [:],
+                                awayScores: game.awayScoreByPeriod ?? [:],
+                                homeTotal: game.homeScore ?? 0,
+                                awayTotal: game.awayScore ?? 0
+                            )
+                        } else {
+                            // NBA Scoring Table
+                            NBAScoringTable(
+                                homeTeam: game.homeTeamAbbr ?? "HOME",
+                                awayTeam: game.awayTeamAbbr ?? "AWAY",
+                                homeScores: game.homeScoreByPeriod ?? [:],
+                                awayScores: game.awayScoreByPeriod ?? [:],
+                                homeTotal: game.homeScore ?? 0,
+                                awayTotal: game.awayScore ?? 0
+                            )
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(HRTheme.blueBorder, lineWidth: 3)
+                    )
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                }
+                
+                // Your prediction
+                if let vote = game.userVote {
+                    VStack(spacing: 12) {
+                        Text("YOUR PREDICTION")
+                            .font(HRTheme.Fonts.subtitle)
+                            .foregroundColor(HRTheme.blue)
+                            .padding(.top, 12)
+                        
+                        HStack(spacing: 16) {
+                            if let logoImage = TeamLogoManager.shared.logoImage(
+                                for: vote == "home" ? (game.homeTeamAbbr ?? "") : (game.awayTeamAbbr ?? ""),
+                                sportType: game.sportType == .nba ? .nba : .mlb
+                            ) {
+                                logoImage
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                            }
+                            
+                            Text(vote == "home" ? game.homeTeam : game.awayTeam)
+                                .font(HRTheme.Fonts.body)
+                                .foregroundColor(HRTheme.blue)
+                        }
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(HRTheme.gold.opacity(0.1))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(HRTheme.gold, lineWidth: 2)
+                        )
+                        
+                        // Prediction result (if game is over)
+                        if game.isOver, let winner = determineWinner() {
+                            let isCorrect = (vote == "home" && winner == "home") || (vote == "away" && winner == "away")
+                            
+                            HStack {
+                                Image(systemName: isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(isCorrect ? .green : .red)
+                                    .font(.system(size: 24))
+                                
+                                Text(isCorrect ? "CORRECT PREDICTION!" : "INCORRECT PREDICTION")
+                                    .font(HRTheme.Fonts.body)
+                                    .foregroundColor(isCorrect ? .green : .red)
+                            }
+                            .padding(.bottom, 12)
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(HRTheme.goldBorder, lineWidth: 3)
+                    )
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                }
+            }
+            .padding()
+        }
+        .background(HRTheme.background.ignoresSafeArea())
+    }
+    
+    private func formatGameTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a, MMM d"
+        return formatter.string(from: date)
+    }
+    
+    private func formatGamePeriod(_ period: String) -> String {
+        if period.lowercased() == "final" {
+            return "FINAL"
+        }
+        
+        if game.sportType == .mlb {
+            // Handle MLB periods like "Top 3rd", "Bottom 5th", etc.
+            return period.uppercased()
+        } else {
+            // Handle NBA quarters like "1st Quarter", "4th Quarter", etc.
+            if period.contains("Q") {
+                return period.uppercased()
+            } else {
+                return period.uppercased()
+            }
+        }
+    }
+    
+    private func determineWinner() -> String? {
+        guard game.isOver, let homeScore = game.homeScore, let awayScore = game.awayScore else {
+            return nil
+        }
+        
+        if homeScore > awayScore {
+            return "home"
+        } else if awayScore > homeScore {
+            return "away"
+        } else {
+            return "tie" // In case of a tie
+        }
+    }
+}
+
+// MLB Scoring Table
+struct MLBScoringTable: View {
+    var homeTeam: String
+    var awayTeam: String
+    var homeScores: [String: String]
+    var awayScores: [String: String]
+    var homeTotal: Int
+    var awayTotal: Int
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 0) {
+                // Header row with inning numbers
+                HStack(spacing: 0) {
+                    Text("TEAM")
+                        .font(HRTheme.Fonts.caption)
+                        .frame(width: 70, height: 40)
+                        .background(HRTheme.blue)
+                        .foregroundColor(.white)
+                    
+                    ForEach(1...9, id: \.self) { inning in
+                        Text("\(inning)")
+                            .font(HRTheme.Fonts.caption)
+                            .frame(width: 40, height: 40)
+                            .background(HRTheme.blue)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Text("R")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(HRTheme.gold)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text("H")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(HRTheme.gold)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text("E")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(HRTheme.gold)
+                        .foregroundColor(HRTheme.blue)
+                }
+                
+                // Away team scores
+                HStack(spacing: 0) {
+                    Text(awayTeam)
+                        .font(HRTheme.Fonts.caption)
+                        .frame(width: 70, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    ForEach(1...9, id: \.self) { inning in
+                        Text(awayScores[String(inning)] ?? "-")
+                            .font(HRTheme.Fonts.body)
+                            .frame(width: 40, height: 40)
+                            .background(Color.white)
+                            .foregroundColor(HRTheme.blue)
+                    }
+                    
+                    Text("\(awayTotal)")
+                        .font(HRTheme.Fonts.body.bold())
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text(awayScores["H"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text(awayScores["E"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                }
+                .overlay(
+                    Rectangle()
+                        .frame(height: 1)
+                        .foregroundColor(HRTheme.blue.opacity(0.3)),
+                    alignment: .bottom
+                )
+                
+                // Home team scores
+                HStack(spacing: 0) {
+                    Text(homeTeam)
+                        .font(HRTheme.Fonts.caption)
+                        .frame(width: 70, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    ForEach(1...9, id: \.self) { inning in
+                        Text(homeScores[String(inning)] ?? "-")
+                            .font(HRTheme.Fonts.body)
+                            .frame(width: 40, height: 40)
+                            .background(Color.white)
+                            .foregroundColor(HRTheme.blue)
+                    }
+                    
+                    Text("\(homeTotal)")
+                        .font(HRTheme.Fonts.body.bold())
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text(homeScores["H"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                    
+                    Text(homeScores["E"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                }
+            }
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(HRTheme.blue, lineWidth: 1)
+            )
+        }
+    }
+}
+
+// NBA Scoring Table
+struct NBAScoringTable: View {
+    var homeTeam: String
+    var awayTeam: String
+    var homeScores: [String: String]
+    var awayScores: [String: String]
+    var homeTotal: Int
+    var awayTotal: Int
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row with quarter numbers
+            HStack(spacing: 0) {
+                Text("TEAM")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 70, height: 40)
+                    .background(HRTheme.blue)
+                    .foregroundColor(.white)
+                
+                Text("1Q")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 40, height: 40)
+                    .background(HRTheme.blue)
+                    .foregroundColor(.white)
+                
+                Text("2Q")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 40, height: 40)
+                    .background(HRTheme.blue)
+                    .foregroundColor(.white)
+                
+                Text("3Q")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 40, height: 40)
+                    .background(HRTheme.blue)
+                    .foregroundColor(.white)
+                
+                Text("4Q")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 40, height: 40)
+                    .background(HRTheme.blue)
+                    .foregroundColor(.white)
+                
+                // OT columns if needed
+                if homeScores["OT"] != nil || awayScores["OT"] != nil {
+                    Text("OT")
+                        .font(HRTheme.Fonts.caption)
+                        .frame(width: 40, height: 40)
+                        .background(HRTheme.blue)
+                        .foregroundColor(.white)
+                }
+                
+                Text("TOTAL")
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 70, height: 40)
+                    .background(HRTheme.gold)
+                    .foregroundColor(HRTheme.blue)
+            }
+            
+            // Away team scores
+            HStack(spacing: 0) {
+                Text(awayTeam)
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 70, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(awayScores["1"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(awayScores["2"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(awayScores["3"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(awayScores["4"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                // OT score if present
+                if homeScores["OT"] != nil || awayScores["OT"] != nil {
+                    Text(awayScores["OT"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                }
+                
+                Text("\(awayTotal)")
+                    .font(HRTheme.Fonts.body.bold())
+                    .frame(width: 70, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+            }
+            .overlay(
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(HRTheme.blue.opacity(0.3)),
+                alignment: .bottom
+            )
+            
+            // Home team scores
+            HStack(spacing: 0) {
+                Text(homeTeam)
+                    .font(HRTheme.Fonts.caption)
+                    .frame(width: 70, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(homeScores["1"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(homeScores["2"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(homeScores["3"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                Text(homeScores["4"] ?? "-")
+                    .font(HRTheme.Fonts.body)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+                
+                // OT score if present
+                if homeScores["OT"] != nil || awayScores["OT"] != nil {
+                    Text(homeScores["OT"] ?? "-")
+                        .font(HRTheme.Fonts.body)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white)
+                        .foregroundColor(HRTheme.blue)
+                }
+                
+                Text("\(homeTotal)")
+                    .font(HRTheme.Fonts.body.bold())
+                    .frame(width: 70, height: 40)
+                    .background(Color.white)
+                    .foregroundColor(HRTheme.blue)
+            }
+        }
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(HRTheme.blue, lineWidth: 1)
+        )
     }
 }
 
